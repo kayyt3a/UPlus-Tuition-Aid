@@ -148,3 +148,10 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:10px 8px
 .values.zh{margin-top:4px;color:var(--muted);letter-spacing:.3em;font-size:.72rem}
 .brandfoot{margin-top:34px;padding-top:18px;border-top:1px solid var(--line)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* handwriting pad */
+.pad{border:1px solid var(--line2);border-radius:var(--r-s);overflow:hidden;background:#fff}
+.pad canvas{display:block;width:100%;touch-action:none;cursor:crosshair;background:#fff}
+.padbar{display:flex;gap:6px;padding:6px;border-top:1px solid var(--line2);background:var(--bg);flex-wrap:wrap}
+.padbar .btn.on{border-color:var(--brand);color:var(--brand-t);background:var(--brand-l)}
+.padbar .i{width:15px;height:15px}

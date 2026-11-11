@@ -135,7 +135,7 @@ async function api(req, res, url) {
   if (p === '/api/answer' && m === 'POST') {
     const c = childFor(user, b.childId), q = QMAP[b.qid]; if (!c || !q) return json(res, 404, { error: 'Not found' });
     let correct, feedback = '';
-    if (q.type === 'written') {
+    if (q.type === 'written' || (q.type === 'short' && (b.image || typeof b.selfCorrect === 'boolean'))) { // handwritten short answers are AI-read too
       if (typeof b.selfCorrect === 'boolean') correct = b.selfCorrect;
       else { const img = mark.parseImage(b.image); if (b.image && !img) return json(res, 400, { error: 'That photo could not be used. Try taking it again.' });
         if (!img && !String(b.given || '').trim()) return json(res, 400, { error: 'Add a photo of your working or type your answer.' });

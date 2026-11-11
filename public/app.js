@@ -20,7 +20,10 @@ const P = {
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   x: '<path d="M6 6l12 12M18 6L6 18"/>',
   upload: '<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
-  import: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>'
+  import: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"/>',
+  eraser: '<path d="M4 16l9-9 6 6-6 6H8z"/><path d="M13 19h7"/>',
+  undo: '<path d="M4 9h11a5 5 0 010 10h-4"/><path d="M8 5L4 9l4 4"/>',
+  trash: '<path d="M5 7h14M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V4h6v3"/>'
 };
 const ico = n => `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
 
@@ -129,24 +132,62 @@ function timerTick() { if (!S || S.mode !== 'mock') return; const left = Math.ce
   if (el) { el.textContent = fmt(left); el.classList.toggle('low', left < 60); } if (left <= 0) finish(true); }
 const modeName = { practice: 'Practice', blitz: 'Flashcard blitz', mock: 'Mock test', holiday: 'Holiday challenge' };
 function question() {
-  const q = S.qs[S.i]; S.qStart = Date.now(); S.busy = false; S.image = null;
+  const q = S.qs[S.i]; S.qStart = Date.now(); S.busy = false; S.image = null; S.pad = null;
+  const written = q.type === 'written', key = written ? 'im_w' : 'im_s';
+  const modes = written ? [['photo', 'Photo of paper'], ['pad', 'Write on screen'], ['type', 'Type']] : [['type', 'Type'], ['pad', 'Write on screen']];
+  let im = LS.get(key); if (!modes.some(m => m[0] === im)) im = written ? (innerWidth < 700 ? 'photo' : 'pad') : 'type'; S.input = im;
   const body = q.type === 'mc' ? q.options.map((o, i) => `<button class="opt" data-o="${esc(o)}"><span class="k">${'ABCDEFGH'[i]}</span>${esc(o)}</button>`).join('')
-    : q.type === 'written' ? `<p class="hint">Do your working on paper, then add a photo of it, or type your answer below.</p>
-      <label class="photo-btn" for="photo">${ico('camera')}Take or choose a photo of your working</label><input type="file" id="photo" accept="image/*" capture="environment" hidden><div id="prev"></div>
-      <label>Typed answer <span style="text-transform:none;letter-spacing:0;font-weight:400">(optional if you add a photo)</span></label><textarea id="ans" rows="3" placeholder="Type your final answer or working"></textarea><button id="sub" class="btn block" style="margin-top:12px">Submit for marking</button>`
-    : `<input type="text" id="ans" class="answer-in" autocomplete="off" placeholder="Type your final answer"><p class="hint" style="margin-top:8px">Work it out on paper first, then type your final answer.</p><button id="sub" class="btn block">Check answer</button>`;
+    : `<div class="sc full" id="modes">${modes.map(([k, l]) => `<button type="button" data-im="${k}">${l}</button>`).join('')}</div>
+      <div style="margin-top:14px">
+      ${written ? `<div id="pane-photo" hidden><p class="hint">Do your working on paper, then add a photo of it.</p>
+        <label class="photo-btn" for="photo">${ico('camera')}Take or choose a photo of your working</label><input type="file" id="photo" accept="image/*" capture="environment" hidden><div id="prev"></div></div>` : ''}
+      <div id="pane-pad" hidden><p class="hint">Write with your finger, a stylus or a mouse. Write clearly and keep your working in order.</p><div id="padhost"></div></div>
+      <div id="pane-type" hidden>${written ? `<textarea id="ans" rows="4" placeholder="Type your final answer or working"></textarea>`
+        : `<input type="text" id="ans" class="answer-in" autocomplete="off" placeholder="Type your final answer"><p class="hint" style="margin-top:8px">Work it out on paper first, then type your final answer.</p>`}</div></div>
+      <button id="sub" class="btn block" style="margin-top:14px">${written ? 'Submit for marking' : 'Check answer'}</button>`;
   app.innerHTML = `<div class="qbar"><button class="x" id="quit" aria-label="Leave practice">${ico('x')}</button>
     <div class="pbar"><i style="width:${S.i / S.qs.length * 100}%"></i></div>
     ${S.mode === 'mock' ? `<span class="timer" id="timer">${fmt(Math.ceil((S.deadline - Date.now()) / 1000))}</span>` : `<span class="cnt">${S.i + 1} / ${S.qs.length}</span>`}</div>
     <div class="qcard ${S.mode === 'blitz' ? 'blitz' : ''}"><div class="qmeta">${esc(q.subject)} · ${esc(q.topic)}${S.mode === 'mock' ? ` · ${S.i + 1} of ${S.qs.length}` : ''}</div>
     <div class="q-text">${esc(q.q)}</div>${body}<div id="fb"></div></div>`;
   $('#quit').onclick = () => { if (confirm('Leave this practice? Your answers so far are saved.')) { clearInterval(S.tick); S = null; home(); } };
-  if (q.type === 'mc') app.querySelectorAll('.opt').forEach(b => b.onclick = () => submit(q, b.dataset.o, b));
-  else { const i = $('#ans'); if (q.type !== 'written') i.focus(); $('#sub').onclick = () => submit(q, i.value);
-    const ph = $('#photo'); if (ph) ph.onchange = async () => { const f = ph.files[0]; if (!f) return;
-      try { S.image = await shrink(f); $('#prev').innerHTML = `<div class="prev"><img src="${S.image}" alt="Your working"><button class="x2" id="rm" type="button" aria-label="Remove photo">${ico('x')}</button></div>`; $('#rm').onclick = () => { S.image = null; ph.value = ''; $('#prev').innerHTML = ''; }; }
-      catch { $('#prev').innerHTML = '<div class="err">That photo could not be opened. Try a JPEG or PNG, or type your answer.</div>'; } };
-    if (q.type !== 'written') i.onkeydown = e => e.key === 'Enter' && submit(q, i.value); }
+  if (q.type === 'mc') { app.querySelectorAll('.opt').forEach(b => b.onclick = () => submit(q, b.dataset.o, b)); return; }
+  const setMode = m => { S.input = m; LS.set(key, m);
+    app.querySelectorAll('#modes button').forEach(b => b.classList.toggle('on', b.dataset.im === m));
+    ['photo', 'pad', 'type'].forEach(k => { const el = $('#pane-' + k); if (el) el.hidden = k !== m; });
+    if (m === 'pad' && !S.pad) S.pad = makePad($('#padhost'), written ? 300 : 160);
+    if (m === 'type') $('#ans').focus(); };
+  app.querySelectorAll('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.im)); setMode(im);
+  $('#sub').onclick = () => submit(q, $('#ans').value);
+  if (!written) $('#ans').onkeydown = e => e.key === 'Enter' && submit(q, $('#ans').value);
+  const ph = $('#photo'); if (ph) ph.onchange = async () => { const f = ph.files[0]; if (!f) return;
+    try { S.image = await shrink(f); $('#prev').innerHTML = `<div class="prev"><img src="${S.image}" alt="Your working"><button class="x2" id="rm" type="button" aria-label="Remove photo">${ico('x')}</button></div>`; $('#rm').onclick = () => { S.image = null; ph.value = ''; $('#prev').innerHTML = ''; }; }
+    catch { $('#prev').innerHTML = '<div class="err">That photo could not be opened. Try a JPEG or PNG, or type your answer.</div>'; } };
+}
+// Drawing pad: finger, stylus or mouse. Exports a white-background JPEG for AI marking.
+function makePad(host, h) {
+  host.innerHTML = `<div class="pad"><canvas></canvas><div class="padbar"><button type="button" class="btn small secondary on" data-t="pen">${ico('pencil')}Pen</button><button type="button" class="btn small secondary" data-t="eraser">${ico('eraser')}Eraser</button><span style="flex:1"></span><button type="button" class="btn small secondary" data-t="undo">${ico('undo')}Undo</button><button type="button" class="btn small secondary" data-t="clear">${ico('trash')}Clear</button></div></div>`;
+  const cv = host.querySelector('canvas'), ctx = cv.getContext('2d'); let strokes = [], cur = null, tool = 'pen', penSeen = false, W = 0, dpr = 1;
+  const draw = () => { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, h); strokes.forEach(st => { const p = st.pts; ctx.beginPath(); ctx.strokeStyle = ctx.fillStyle = st.eraser ? '#fff' : '#111'; ctx.lineWidth = st.eraser ? 22 : 2.8; ctx.lineCap = ctx.lineJoin = 'round';
+    if (p.length === 1) { ctx.arc(p[0][0], p[0][1], ctx.lineWidth / 2, 0, 7); ctx.fill(); return; }
+    ctx.moveTo(p[0][0], p[0][1]); for (let i = 1; i < p.length - 1; i++) ctx.quadraticCurveTo(p[i][0], p[i][1], (p[i][0] + p[i + 1][0]) / 2, (p[i][1] + p[i + 1][1]) / 2);
+    ctx.lineTo(p[p.length - 1][0], p[p.length - 1][1]); ctx.stroke(); }); };
+  const size = () => { const w = host.clientWidth || 300, k = W ? w / W : 1; dpr = Math.min(2, window.devicePixelRatio || 1); W = w;
+    cv.style.height = h + 'px'; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (k !== 1) strokes.forEach(st => st.pts.forEach(pt => pt[0] *= k)); draw(); };
+  const onResize = () => { if (!document.body.contains(cv)) return removeEventListener('resize', onResize); if (host.clientWidth) size(); };
+  addEventListener('resize', onResize); size();
+  const pos = e => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+  cv.addEventListener('pointerdown', e => { if (e.pointerType === 'pen') penSeen = true; else if (e.pointerType === 'touch' && penSeen) return; // palm rejection
+    e.preventDefault(); cv.setPointerCapture(e.pointerId); cur = { eraser: tool === 'eraser', pts: [pos(e)] }; strokes.push(cur); draw(); });
+  cv.addEventListener('pointermove', e => { if (!cur || (e.pointerType === 'touch' && penSeen)) return; const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : []; (evs.length ? evs : [e]).forEach(ev => cur.pts.push(pos(ev))); draw(); });
+  ['pointerup', 'pointercancel'].forEach(t => cv.addEventListener(t, () => { cur = null; }));
+  host.querySelectorAll('[data-t]').forEach(b => b.onclick = () => { const t = b.dataset.t;
+    if (t === 'pen' || t === 'eraser') { tool = t; host.querySelectorAll('[data-t=pen],[data-t=eraser]').forEach(x => x.classList.toggle('on', x === b)); }
+    else if (t === 'undo') { strokes.pop(); draw(); } else if (t === 'clear') { strokes = []; draw(); } });
+  const hasInk = () => strokes.some(st => !st.eraser);
+  return { hasInk, export: () => { if (!hasInk()) return null; const f = Math.min(1, 1400 / cv.width), o = document.createElement('canvas'); o.width = Math.round(cv.width * f); o.height = Math.round(cv.height * f);
+    o.getContext('2d').drawImage(cv, 0, 0, o.width, o.height); return o.toDataURL('image/jpeg', 0.85); } };
 }
 // Shrink a phone photo (often 5MB+) to a ~300KB JPEG before upload.
 async function shrink(file) {
@@ -156,19 +197,22 @@ async function shrink(file) {
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.8); } finally { URL.revokeObjectURL(url); }
 }
 async function submit(q, given, btn, selfCorrect) {
-  if (S.busy) return; if (q.type !== 'mc' && selfCorrect === undefined && !String(given).trim() && !(q.type === 'written' && S.image)) return; S.busy = true;
-  const ms = Date.now() - S.qStart, mode = S.mode;
-  if (q.type === 'written' && selfCorrect === undefined) { const sb = $('#sub'); if (sb) sb.disabled = true; $('#fb').innerHTML = `<div class="fb"><strong>${S.image ? 'Reading your working…' : 'Marking your answer…'}</strong></div>`; }
-  let r; try { r = await api('/answer', { body: { childId: child.id, qid: q.id, given, ms, mode, mockId: S.mockId, selfCorrect, image: selfCorrect === undefined && q.type === 'written' ? S.image : undefined } }); }
+  if (S.busy) return;
+  const hand = q.type !== 'mc' && selfCorrect === undefined, img = hand ? (S.input === 'pad' ? (S.pad && S.pad.export()) : S.input === 'photo' ? S.image : null) : null;
+  if (q.type !== 'mc' && S.input !== 'type') given = ''; // typed text is ignored while photo/pad is selected
+  if (hand && !String(given).trim() && !img) return; S.busy = true;
+  const ms = Date.now() - S.qStart, mode = S.mode, ai = q.type === 'written' || (q.type === 'short' && img);
+  if (ai && selfCorrect === undefined) { const sb = $('#sub'); if (sb) sb.disabled = true; $('#fb').innerHTML = `<div class="fb"><strong>${img ? 'Reading your handwriting…' : 'Marking your answer…'}</strong></div>`; }
+  let r; try { r = await api('/answer', { body: { childId: child.id, qid: q.id, given, ms, mode, mockId: S.mockId, selfCorrect, image: img || undefined } }); }
   catch (e) { S.busy = false; if (e.status === 402) return locked(); $('#fb').innerHTML = `<div class="fb bad"><strong>${esc(e.message)}</strong></div>`; const sb = $('#sub'); if (sb) sb.disabled = false; return; }
   if (r.unreadable) { S.busy = false; const sb = $('#sub'); if (sb) sb.disabled = false; $('#fb').innerHTML = `<div class="fb bad"><strong>We couldn't read that photo</strong><div class="ex">${esc(r.feedback)}</div></div>`; return; }
-  if (r.needsSelfMark) { S.busy = false; $('#ans').disabled = true; $('#sub').remove();
+  if (r.needsSelfMark) { S.busy = false; $('#ans').disabled = true; $('#sub').remove(); app.querySelectorAll('#modes button').forEach(b => b.disabled = true); const ph = $('#padhost'); if (ph) ph.style.pointerEvents = 'none';
     $('#fb').innerHTML = `<div class="fb"><strong>Model answer</strong><div class="ex">${esc(r.answer)}<br>${esc(r.explain || '')}</div><p class="muted" style="margin:10px 0 8px">Compare this with your answer. Did you get it right?</p>
       <div class="row"><button class="btn" id="yes">I got it right</button><button class="btn secondary" id="no">Not quite</button></div></div>`;
     $('#yes').onclick = () => submit(q, given, null, true); $('#no').onclick = () => submit(q, given, null, false); return; }
   S.answered++; S.results[S.i] = r.correct; if (r.correct) S.right++;
   if (q.type === 'mc') app.querySelectorAll('.opt').forEach(b => { b.disabled = true; if (b.dataset.o === r.answer) b.classList.add('right'); else if (b === btn) b.classList.add('wrong'); });
-  else { const a = $('#ans'); if (a) a.disabled = true; const sb = $('#sub'); if (sb) sb.remove(); }
+  else { const a = $('#ans'); if (a) a.disabled = true; const sb = $('#sub'); if (sb) sb.remove(); app.querySelectorAll('#modes button').forEach(b => b.disabled = true); const ph = $('#padhost'); if (ph) ph.style.pointerEvents = 'none'; }
   const last = S.i + 1 >= S.qs.length, quick = S.mode === 'blitz' && r.correct;
   $('#fb').innerHTML = `<div class="fb ${r.correct ? 'good' : 'bad'}"><strong>${r.correct ? 'Correct' : 'Not quite'}</strong>${r.correct ? '' : `<div class="ex">Answer: <b>${esc(r.answer)}</b></div>`}${r.explain ? `<div class="ex">${esc(r.explain)}</div>` : ''}</div>
     <div class="next-row"><button id="next" class="btn block">${last ? 'Finish' : 'Next question'}</button></div>`;
