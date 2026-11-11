@@ -35,16 +35,17 @@ nav.onclick = e => { const k = e.target.closest('[data-nav]')?.dataset.nav; if (
   ({ home, mine, parent: parentView, admin, import: importScreen, out: async () => { await api('/logout', { body: {} }); ME = null; authScreen(); } })[k](); };
 
 // ---------- shared bits ----------
-const ring = (val, max, label, color = '#fbbf24', track = '#ffffff33', size = 78, sw = 9) => { const r = (size - sw) / 2, c = 2 * Math.PI * r, p = Math.min(1, max ? val / max : 0);
+const ring = (val, max, label, color = '#f1af59', track = '#ffffff33', size = 78, sw = 9) => { const r = (size - sw) / 2, c = 2 * Math.PI * r, p = Math.min(1, max ? val / max : 0);
   return `<div class="ring" style="width:${size}px;height:${size}px"><svg width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${track}" stroke-width="${sw}"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}"/></svg><b>${label}</b></div>`; };
 const accColor = a => a >= 75 ? 'var(--good)' : a >= 55 ? 'var(--warn)' : 'var(--bad)';
 const accPill = a => `<span class="pill ${a >= 75 ? 'good' : a >= 55 ? 'warn' : 'bad'}">${a}%</span>`;
+const valuesHtml = () => `<div class="values"><span>Uplift</span><span>Persevere</span><span>Lead</span><span>Understand</span><span>Support</span></div><div class="values zh"><span>鼓舞</span><span>坚持</span><span>引导</span><span>理解</span><span>支持</span></div>`;
 const stat = (i, v, l) => `<div class="stat"><i>${i}</i><b>${v}</b><span>${l}</span></div>`;
 
 // ---------- auth ----------
 function authScreen(mode = 'login', err = '') {
   setNav();
-  app.innerHTML = `<div class="card hero-auth"><div style="font-size:2.6rem">🎓</div><h1>Practice that sticks</h1><p>Extra homework and holiday practice from UPlus Education</p></div>
+  app.innerHTML = `<div class="card hero-auth"><div class="logo-card"><img src="logo.png" alt="UPlus Education 优加教育"></div><h1>Practice that sticks</h1><p>Extra homework and holiday practice for UPlus Education families</p>${valuesHtml()}</div>
   <div class="card"><div class="tabs"><button data-m="login" class="${mode === 'login' ? 'on' : ''}">Log in</button><button data-m="signup" class="${mode === 'signup' ? 'on' : ''}">New family</button></div>
   <form id="f">${mode === 'signup' ? `<label>Parent name</label><input type="text" name="name" required>` : ''}
   <label>Email</label><input type="email" name="email" required autocomplete="username">
@@ -70,7 +71,7 @@ function addChild(first) {
 function home() {
   setNav('home'); if (!ME.user.paid) return locked();
   const cat = ME.catalog[child.year] || {}, subs = Object.keys(cat); if (!subs.includes(subj)) subj = subs[0];
-  app.innerHTML = `<div class="card hello">${`<div class="avatar">${avatar(child)}</div>`}<div><h2>Hi ${esc(child.name)}!</h2><p id="sub-line">Ready for today's practice?</p></div><div id="goal"></div></div>
+  app.innerHTML = `<div class="card hello">${`<div class="avatar">${avatar(child)}</div>`}<div><h2>Hi <em>${esc(child.name)}</em>!</h2><p id="sub-line">Ready for today's practice?</p></div><div id="goal"></div></div>
   <div class="card"><label style="margin-top:0">Who's practising?</label><div class="chips">${ME.children.map(c => `<button class="chip ${c.id === child.id ? 'on' : ''}" data-kid="${c.id}">${avatar(c)} ${esc(c.name)}</button>`).join('')}<button class="chip" id="addkid">＋ Add</button></div>
     <label>Year group</label><select id="yr">${ME.years.map(y => `<option ${y === child.year ? 'selected' : ''}>${y}</option>`).join('')}</select></div>
   <div class="card"><h3 style="margin-top:0">Choose a subject</h3>
@@ -80,7 +81,7 @@ function home() {
     <button class="tile primary" id="go"><span class="ic">📝</span><b>Practice</b><span class="d">10 questions</span></button>
     <button class="tile" id="blitz"><span class="ic">⚡</span><b>Flashcard blitz</b><span class="d">25 fast cards</span></button>
     <button class="tile" id="mock"><span class="ic">⏱️</span><b>Timed mock test</b><span class="d">15 questions, against the clock</span></button>
-    <button class="tile" id="holiday"><span class="ic">🏖️</span><b>Holiday challenge</b><span class="d">20 mixed questions</span></button></div>` : ''}`;
+    <button class="tile" id="holiday"><span class="ic">🏖️</span><b>Holiday challenge</b><span class="d">20 mixed questions</span></button></div>` : ''}<div class="brandfoot">${valuesHtml()}</div>`;
   const top = $('#top'); if (top) { top.innerHTML = '<option value="">All topics</option>' + (cat[subj] || []).map(t => `<option>${t}</option>`).join('');
     app.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { subj = b.dataset.s; home(); }); }
   app.querySelectorAll('[data-kid]').forEach(b => b.onclick = () => { child = ME.children.find(c => c.id === +b.dataset.kid); LS.set('child', child.id); home(); });

@@ -4,6 +4,9 @@ Question bank for UPlus Education families (Perth Modern selective-entry prep): 
 
 Zero dependencies. Needs Node 22.5+ (uses built-in SQLite).
 
+## Branding
+Colours follow the UPlus website: orange `#F1AF59`, indigo `#3949AB`, dark ink `#1F2937`, off-white `#F8F8F8`. `public/logo.png` and `public/favicon.png` were cut from a screenshot of the website — replace them with the official logo files (transparent PNG or SVG) for sharper results.
+
 ## Run
     npm start            # http://localhost:3000
 
