@@ -1,0 +1,1 @@
+{ "name": "uplus-practice", "version": "0.2.0", "private": true, "scripts": { "start": "node --disable-warning=ExperimentalWarning server/index.js" }, "engines": { "node": ">=22.5" } }

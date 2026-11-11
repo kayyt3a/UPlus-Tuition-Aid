@@ -1,23 +1,31 @@
 # UPlus Practice
 
-A grind-able question bank for tuition-centre families: pick a year group, subject and topic, answer 10 questions with instant marking and explanations, earn XP and streaks. Parents get a progress page. Questions the child gets wrong come up more often. A "Holiday challenge" gives a mixed 20-question set.
+Question bank for UPlus Education families (Perth Modern selective-entry prep): practice, flashcard blitz, timed mock tests, AI marking of written answers, progress tracking for kids and parents, and a tutor admin page with a manual "paid until" switch.
 
-No backend: progress is stored in the child's browser, so it hosts free anywhere static (GitHub Pages, Vercel, Netlify).
+Zero dependencies. Needs Node 22.5+ (uses built-in SQLite).
 
-## Run locally
-    python3 -m http.server 8000   # then open http://localhost:8000
+## Run
+    npm start            # http://localhost:3000
 
-## Add questions from your booklets
-1. Copy `tools/template.csv`, fill one row per question (`type` = `mc` or `short`; separate accepted short answers with `|`).
-2. `node tools/csv-to-json.js yourfile.csv` appends them to `data/questions.json`.
+First start seeds demo data:
+- Parent: `parent@uplus.test` / `parent123` (child Mia, 10 days of history)
+- Admin (tutor): `admin@uplus.test` / `admin123`
+- New families sign up with the family code (default `UPLUS`, set `SIGNUP_CODE` to change) and get a 7-day free trial.
 
-## New: flashcard blitz + AI marking
-- **⚡ Flashcard blitz**: 25 rapid-fire cards, auto-advances on a correct answer, shows total time.
-- **Written answers** (`"type":"written"` in the JSON) are marked by AI via `api/mark.js`, so neither tutors nor parents mark.
-- Deploy on Vercel and set env vars `ANTHROPIC_API_KEY` and `ACCESS_CODES` (comma-separated family codes, e.g. `UPLUS-SMITH,UPLUS-NGUYEN`). The API key stays server-side. Only families with a code can use AI marking, which doubles as a simple paywall until real billing exists.
-- Multiple-choice and short answers are still marked instantly in the browser, free.
+## Environment variables
+| Var | Purpose |
+|---|---|
+| `PORT` | default 3000 |
+| `SIGNUP_CODE` | code parents need to create an account |
+| `ANTHROPIC_API_KEY` | enables AI marking of `written` questions. Without it, children self-mark against the model answer |
+| `MARK_MODEL` | override marking model |
+| `DB_FILE` | SQLite path (default `./uplus.db`) |
 
-## Known limits / next steps
-- Progress lives on one device (no login, parents can't see it remotely). Next step: Supabase accounts + invite codes.
-- Auto-marking only (multiple choice / short answer). Written answers would need self-marking.
-- Sample questions are placeholders; replace with your booklet content.
+## Adding questions
+Fill `tools/template.csv`, then `node tools/csv-to-json.js yourfile.csv`; restart the server. Types: `mc`, `short`, `written`. The sample questions are placeholders.
+
+## Before real families use it
+- Change the seeded admin password (or delete the demo users) and run behind HTTPS on a domain.
+- Test from a phone in mainland China, including inside WeChat.
+- Add a privacy notice (children's names and results are stored).
+- Confirm you may reuse the booklet/past-paper content.
