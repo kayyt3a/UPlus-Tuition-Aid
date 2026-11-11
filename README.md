@@ -35,8 +35,11 @@ First start seeds demo data:
 ## Importing booklets (drag & drop)
 Log in as admin → **Import booklet**. Pick the year group, drop a PDF (or page photos, max 30 MB each; split long booklets). Claude extracts every question into a review queue, flagging answers it had to work out itself and questions that depend on a diagram. Edit anything, then approve; approved questions go live immediately. Needs `ANTHROPIC_API_KEY` (optional `EXTRACT_MODEL`). Always check flagged answers before approving.
 
-## Adding questions by CSV
-Fill `tools/template.csv`, then `node tools/csv-to-json.js yourfile.csv`; restart the server. Types: `mc`, `short`, `written`. The sample questions are placeholders.
+## Managing questions (admin → Questions)
+All questions live in the database and are managed in the app: add one at a time with the form, edit, delete (students stop seeing it; past results are kept), search and filter. New year groups, subjects and topics are created just by typing them. The 20 sample questions that ship with the app can be removed with one button. To add many at once, use **Import** (below).
+
+## Language
+A 中文 / English toggle in the header switches the whole interface (Simplified Chinese). The choice is remembered per device, and defaults to Chinese on Chinese-language browsers. Strings live in `public/i18n.js` (keys are the English text; anything missing falls back to English). AI marking feedback is written in Chinese when the child is using the Chinese interface. Question content is shown exactly as entered, so a bilingual question is simply typed bilingually.
 
 ## Before real families use it
 - Change the seeded admin password (or delete the demo users) and run behind HTTPS on a domain.
