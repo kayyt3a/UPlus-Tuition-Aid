@@ -1,25 +1,303 @@
 {
-  "centre": "U Plus Tuition",
-  "yearGroups": ["Year 3", "Year 4", "Year 5", "Year 6"],
-  "questions": [
-    {"id":"m3-001","year":"Year 3","subject":"Maths","topic":"Times tables","type":"short","q":"7 × 8 = ?","answer":["56"],"explain":"7 × 8 = 56 (5, 6, 7, 8 → 56 = 7 × 8)."},
-    {"id":"m3-002","year":"Year 3","subject":"Maths","topic":"Times tables","type":"mc","q":"What is 6 × 9?","options":["54","56","63","45"],"answer":["54"],"explain":"6 × 9 = 54."},
-    {"id":"m3-003","year":"Year 3","subject":"Maths","topic":"Fractions","type":"mc","q":"Which fraction is equal to one half?","options":["2/4","1/3","3/5","2/3"],"answer":["2/4"],"explain":"2/4 simplifies to 1/2."},
-    {"id":"m3-004","year":"Year 3","subject":"Maths","topic":"Addition","type":"short","q":"346 + 278 = ?","answer":["624"],"explain":"346 + 278 = 624."},
-    {"id":"e3-001","year":"Year 3","subject":"English","topic":"Spelling","type":"mc","q":"Which word is spelled correctly?","options":["necessary","neccessary","necesary","nessessary"],"answer":["necessary"],"explain":"One c, two s's: ne-ces-sa-ry."},
-    {"id":"e3-002","year":"Year 3","subject":"English","topic":"Grammar","type":"mc","q":"Which is a noun?  'The happy dog ran quickly.'","options":["happy","dog","ran","quickly"],"answer":["dog"],"explain":"A noun names a thing or animal: dog."},
-    {"id":"m4-001","year":"Year 4","subject":"Maths","topic":"Multiplication","type":"short","q":"24 × 6 = ?","answer":["144"],"explain":"20×6=120 and 4×6=24, so 144."},
-    {"id":"m4-002","year":"Year 4","subject":"Maths","topic":"Decimals","type":"short","q":"0.5 + 0.25 = ?","answer":["0.75",".75"],"explain":"Half plus a quarter is three quarters = 0.75."},
-    {"id":"m4-003","year":"Year 4","subject":"Maths","topic":"Perimeter","type":"short","q":"A rectangle is 8 cm long and 5 cm wide. What is its perimeter in cm?","answer":["26","26cm","26 cm"],"explain":"2 × (8 + 5) = 26 cm."},
-    {"id":"e4-001","year":"Year 4","subject":"English","topic":"Punctuation","type":"mc","q":"Which sentence uses an apostrophe correctly?","options":["The dogs bone was big.","The dog's bone was big.","The dogs' bone's was big.","The dog,s bone was big."],"answer":["The dog's bone was big."],"explain":"Apostrophe + s shows the bone belongs to one dog."},
-    {"id":"e4-002","year":"Year 4","subject":"English","topic":"Vocabulary","type":"mc","q":"Which word is a synonym for 'enormous'?","options":["tiny","huge","quiet","angry"],"answer":["huge"],"explain":"Enormous and huge both mean very big."},
-    {"id":"m5-001","year":"Year 5","subject":"Maths","topic":"Fractions","type":"short","q":"3/4 + 1/8 = ? (give as a fraction, e.g. 1/2)","answer":["7/8"],"explain":"3/4 = 6/8, and 6/8 + 1/8 = 7/8."},
-    {"id":"m5-002","year":"Year 5","subject":"Maths","topic":"Percentages","type":"short","q":"What is 15% of 200?","answer":["30"],"explain":"10% = 20, 5% = 10, so 15% = 30."},
-    {"id":"m5-003","year":"Year 5","subject":"Maths","topic":"Area","type":"short","q":"A triangle has base 10 cm and height 6 cm. What is its area in cm²?","answer":["30"],"explain":"½ × 10 × 6 = 30."},
-    {"id":"e5-001","year":"Year 5","subject":"English","topic":"Grammar","type":"mc","q":"Which sentence is in the passive voice?","options":["The cat chased the mouse.","The mouse was chased by the cat.","The cat is chasing.","Chase the mouse!"],"answer":["The mouse was chased by the cat."],"explain":"In the passive the subject receives the action."},
-    {"id":"m6-001","year":"Year 6","subject":"Maths","topic":"Algebra","type":"short","q":"Solve: 3x + 5 = 23. x = ?","answer":["6"],"explain":"3x = 18, so x = 6."},
-    {"id":"m6-002","year":"Year 6","subject":"Maths","topic":"Ratio","type":"short","q":"Share 40 sweets in the ratio 3:5. How many is the larger share?","answer":["25"],"explain":"40 ÷ 8 = 5 per part; 5 × 5 = 25."},
-    {"id":"m6-003","year":"Year 6","subject":"Maths","topic":"Percentages","type":"short","q":"A £80 coat is reduced by 25%. What is the sale price in £?","answer":["60","£60"],"explain":"25% of 80 = 20; 80 − 20 = 60."},
-    {"id":"e6-001","year":"Year 6","subject":"English","topic":"Vocabulary","type":"mc","q":"Which word is an antonym of 'reluctant'?","options":["unwilling","eager","slow","tired"],"answer":["eager"],"explain":"Reluctant = unwilling; the opposite is eager."}
-  ]
+ "centre": "U Plus Tuition",
+ "yearGroups": [
+  "Year 3",
+  "Year 4",
+  "Year 5",
+  "Year 6"
+ ],
+ "questions": [
+  {
+   "id": "m3-001",
+   "year": "Year 3",
+   "subject": "Maths",
+   "topic": "Times tables",
+   "type": "short",
+   "q": "7 \u00d7 8 = ?",
+   "answer": [
+    "56"
+   ],
+   "explain": "7 \u00d7 8 = 56 (5, 6, 7, 8 \u2192 56 = 7 \u00d7 8)."
+  },
+  {
+   "id": "m3-002",
+   "year": "Year 3",
+   "subject": "Maths",
+   "topic": "Times tables",
+   "type": "mc",
+   "q": "What is 6 \u00d7 9?",
+   "options": [
+    "54",
+    "56",
+    "63",
+    "45"
+   ],
+   "answer": [
+    "54"
+   ],
+   "explain": "6 \u00d7 9 = 54."
+  },
+  {
+   "id": "m3-003",
+   "year": "Year 3",
+   "subject": "Maths",
+   "topic": "Fractions",
+   "type": "mc",
+   "q": "Which fraction is equal to one half?",
+   "options": [
+    "2/4",
+    "1/3",
+    "3/5",
+    "2/3"
+   ],
+   "answer": [
+    "2/4"
+   ],
+   "explain": "2/4 simplifies to 1/2."
+  },
+  {
+   "id": "m3-004",
+   "year": "Year 3",
+   "subject": "Maths",
+   "topic": "Addition",
+   "type": "short",
+   "q": "346 + 278 = ?",
+   "answer": [
+    "624"
+   ],
+   "explain": "346 + 278 = 624."
+  },
+  {
+   "id": "e3-001",
+   "year": "Year 3",
+   "subject": "English",
+   "topic": "Spelling",
+   "type": "mc",
+   "q": "Which word is spelled correctly?",
+   "options": [
+    "necessary",
+    "neccessary",
+    "necesary",
+    "nessessary"
+   ],
+   "answer": [
+    "necessary"
+   ],
+   "explain": "One c, two s's: ne-ces-sa-ry."
+  },
+  {
+   "id": "e3-002",
+   "year": "Year 3",
+   "subject": "English",
+   "topic": "Grammar",
+   "type": "mc",
+   "q": "Which is a noun?  'The happy dog ran quickly.'",
+   "options": [
+    "happy",
+    "dog",
+    "ran",
+    "quickly"
+   ],
+   "answer": [
+    "dog"
+   ],
+   "explain": "A noun names a thing or animal: dog."
+  },
+  {
+   "id": "m4-001",
+   "year": "Year 4",
+   "subject": "Maths",
+   "topic": "Multiplication",
+   "type": "short",
+   "q": "24 \u00d7 6 = ?",
+   "answer": [
+    "144"
+   ],
+   "explain": "20\u00d76=120 and 4\u00d76=24, so 144."
+  },
+  {
+   "id": "m4-002",
+   "year": "Year 4",
+   "subject": "Maths",
+   "topic": "Decimals",
+   "type": "short",
+   "q": "0.5 + 0.25 = ?",
+   "answer": [
+    "0.75",
+    ".75"
+   ],
+   "explain": "Half plus a quarter is three quarters = 0.75."
+  },
+  {
+   "id": "m4-003",
+   "year": "Year 4",
+   "subject": "Maths",
+   "topic": "Perimeter",
+   "type": "short",
+   "q": "A rectangle is 8 cm long and 5 cm wide. What is its perimeter in cm?",
+   "answer": [
+    "26",
+    "26cm",
+    "26 cm"
+   ],
+   "explain": "2 \u00d7 (8 + 5) = 26 cm."
+  },
+  {
+   "id": "e4-001",
+   "year": "Year 4",
+   "subject": "English",
+   "topic": "Punctuation",
+   "type": "mc",
+   "q": "Which sentence uses an apostrophe correctly?",
+   "options": [
+    "The dogs bone was big.",
+    "The dog's bone was big.",
+    "The dogs' bone's was big.",
+    "The dog,s bone was big."
+   ],
+   "answer": [
+    "The dog's bone was big."
+   ],
+   "explain": "Apostrophe + s shows the bone belongs to one dog."
+  },
+  {
+   "id": "e4-002",
+   "year": "Year 4",
+   "subject": "English",
+   "topic": "Vocabulary",
+   "type": "mc",
+   "q": "Which word is a synonym for 'enormous'?",
+   "options": [
+    "tiny",
+    "huge",
+    "quiet",
+    "angry"
+   ],
+   "answer": [
+    "huge"
+   ],
+   "explain": "Enormous and huge both mean very big."
+  },
+  {
+   "id": "m5-001",
+   "year": "Year 5",
+   "subject": "Maths",
+   "topic": "Fractions",
+   "type": "short",
+   "q": "3/4 + 1/8 = ? (give as a fraction, e.g. 1/2)",
+   "answer": [
+    "7/8"
+   ],
+   "explain": "3/4 = 6/8, and 6/8 + 1/8 = 7/8."
+  },
+  {
+   "id": "m5-002",
+   "year": "Year 5",
+   "subject": "Maths",
+   "topic": "Percentages",
+   "type": "short",
+   "q": "What is 15% of 200?",
+   "answer": [
+    "30"
+   ],
+   "explain": "10% = 20, 5% = 10, so 15% = 30."
+  },
+  {
+   "id": "m5-003",
+   "year": "Year 5",
+   "subject": "Maths",
+   "topic": "Area",
+   "type": "short",
+   "q": "A triangle has base 10 cm and height 6 cm. What is its area in cm\u00b2?",
+   "answer": [
+    "30"
+   ],
+   "explain": "\u00bd \u00d7 10 \u00d7 6 = 30."
+  },
+  {
+   "id": "e5-001",
+   "year": "Year 5",
+   "subject": "English",
+   "topic": "Grammar",
+   "type": "mc",
+   "q": "Which sentence is in the passive voice?",
+   "options": [
+    "The cat chased the mouse.",
+    "The mouse was chased by the cat.",
+    "The cat is chasing.",
+    "Chase the mouse!"
+   ],
+   "answer": [
+    "The mouse was chased by the cat."
+   ],
+   "explain": "In the passive the subject receives the action."
+  },
+  {
+   "id": "m6-001",
+   "year": "Year 6",
+   "subject": "Maths",
+   "topic": "Algebra",
+   "type": "short",
+   "q": "Solve: 3x + 5 = 23. x = ?",
+   "answer": [
+    "6"
+   ],
+   "explain": "3x = 18, so x = 6."
+  },
+  {
+   "id": "m6-002",
+   "year": "Year 6",
+   "subject": "Maths",
+   "topic": "Ratio",
+   "type": "short",
+   "q": "Share 40 sweets in the ratio 3:5. How many is the larger share?",
+   "answer": [
+    "25"
+   ],
+   "explain": "40 \u00f7 8 = 5 per part; 5 \u00d7 5 = 25."
+  },
+  {
+   "id": "m6-003",
+   "year": "Year 6",
+   "subject": "Maths",
+   "topic": "Percentages",
+   "type": "short",
+   "q": "A \u00a380 coat is reduced by 25%. What is the sale price in \u00a3?",
+   "answer": [
+    "60",
+    "\u00a360"
+   ],
+   "explain": "25% of 80 = 20; 80 \u2212 20 = 60."
+  },
+  {
+   "id": "e6-001",
+   "year": "Year 6",
+   "subject": "English",
+   "topic": "Vocabulary",
+   "type": "mc",
+   "q": "Which word is an antonym of 'reluctant'?",
+   "options": [
+    "unwilling",
+    "eager",
+    "slow",
+    "tired"
+   ],
+   "answer": [
+    "eager"
+   ],
+   "explain": "Reluctant = unwilling; the opposite is eager."
+  },
+  {
+   "id": "m5-w01",
+   "year": "Year 5",
+   "subject": "Maths",
+   "topic": "Word problems",
+   "type": "written",
+   "q": "Mia has 3 packs of 12 stickers. She gives 9 away. How many does she have left? Show your working.",
+   "answer": [
+    "3 \u00d7 12 = 36, 36 \u2212 9 = 27 stickers"
+   ],
+   "explain": "3 \u00d7 12 = 36, then 36 \u2212 9 = 27."
+  }
+ ]
 }

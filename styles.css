@@ -12,8 +12,9 @@ button.secondary{background:transparent;color:var(--accent);border:2px solid var
 button.opt{display:block;width:100%;text-align:left;background:var(--bg);color:var(--ink);border:2px solid #8884}
 button.opt.right{border-color:var(--good);background:#16a34a22}
 button.opt.wrong{border-color:var(--bad);background:#dc262622}
-input[type=text],select{width:100%;padding:12px;border-radius:10px;border:2px solid #8886;background:var(--bg);color:var(--ink);margin:6px 0}
+input[type=text],select,textarea{width:100%;padding:12px;border-radius:10px;border:2px solid #8886;background:var(--bg);color:var(--ink);margin:6px 0}
 .bar{height:10px;background:#8883;border-radius:6px;overflow:hidden}.bar>div{height:100%;background:var(--good)}
 .fb{padding:10px;border-radius:10px;margin-top:10px}.fb.good{background:#16a34a22}.fb.bad{background:#dc262622}
 .muted{color:var(--muted);font-size:.9rem}
 table{width:100%;border-collapse:collapse}td,th{padding:6px;text-align:left;border-bottom:1px solid #8883}
+textarea{font:inherit;width:100%;margin:6px 0;border-radius:10px;border:2px solid #8886;padding:12px;background:var(--bg);color:var(--ink)}

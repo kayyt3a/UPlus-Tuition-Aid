@@ -28,11 +28,13 @@ function home(){
     <label>Year group</label><select id="yr">${years.map(y=>`<option ${y===p.year?'selected':''}>${y}</option>`).join('')}</select>
     <label>Subject</label><select id="sub"></select>
     <label>Topic</label><select id="top"></select>
+    <button id="blitz">⚡ Flashcard blitz (25 Qs)</button>
     <button id="go">Start ${SESSION_SIZE} questions</button>
     <button class="secondary" id="holiday">🏖️ Holiday challenge (mixed, 20 Qs)</button>
   </div>
   <div class="card"><button class="secondary" id="prog">📊 Progress (parents)</button>
-  <button class="secondary" id="sw">Switch child</button></div>`;
+  <button class="secondary" id="sw">Switch child</button>
+  <button class="secondary" id="code">🔑 Access code${state.code?' ✓':''}</button></div>`;
   const yr=$('#yr'), sub=$('#sub'), top=$('#top');
   const pool = () => DATA.questions.filter(q=>q.year===yr.value);
   function fillSub(){ sub.innerHTML = [...new Set(pool().map(q=>q.subject))].map(s=>`<option>${s}</option>`).join(''); fillTop(); }
@@ -40,6 +42,8 @@ function home(){
   yr.onchange = () => { p.year = yr.value; save(); fillSub(); }; sub.onchange = fillTop; fillSub();
   $('#go').onclick = () => start(pool().filter(q=>q.subject===sub.value && (!top.value||q.topic===top.value)), SESSION_SIZE);
   $('#holiday').onclick = () => start(pool(), 20);
+  $('#blitz').onclick = () => start(pool().filter(q=>q.subject===sub.value && (!top.value||q.topic===top.value)), 25, true);
+  $('#code').onclick = () => { const c = prompt('Enter the access code from U Plus (needed for written-answer marking):', state.code||''); if(c!==null){ state.code=c.trim(); save(); home(); } };
   $('#prog').onclick = progress; $('#sw').onclick = profileScreen;
 }
 
@@ -62,9 +66,9 @@ function pick(pool, n){
   return items.sort((a,b)=>b.k-a.k).slice(0,n).map(x=>x.q);
 }
 
-function start(pool, n){
+function start(pool, n, blitz=false){
   if(!pool.length) return alert('No questions here yet!');
-  session = {qs: pick(pool,n), i:0, right:0};
+  session = {qs: pick(pool,n), i:0, right:0, blitz, t0: Date.now()};
   question();
 }
 
@@ -75,24 +79,41 @@ function question(){
     <p class="muted">Question ${s.i+1} of ${s.qs.length} · ${esc(q.subject)} · ${esc(q.topic)}</p>
     <h2>${esc(q.q)}</h2>
     ${q.type==='mc' ? q.options.map((o,i)=>`<button class="opt" data-o="${esc(o)}">${esc(o)}</button>`).join('')
+      : q.type==='written' ? `<textarea id="ans" rows="4" placeholder="Write your answer and working"></textarea><button id="sub">Submit for marking</button>`
       : `<input type="text" id="ans" autocomplete="off" placeholder="Your answer"><button id="sub">Check</button>`}
     <div id="fb"></div></div>`;
   if(q.type==='mc') app.querySelectorAll('.opt').forEach(b => b.onclick = () => mark(q, b.dataset.o, b));
-  else { const i=$('#ans'); i.focus(); $('#sub').onclick = () => mark(q, i.value); i.onkeydown = e => e.key==='Enter' && mark(q,i.value); }
+  else { const i=$('#ans'); i.focus(); $('#sub').onclick = () => mark(q, i.value); if(q.type!=='written') i.onkeydown = e => e.key==='Enter' && mark(q,i.value); }
 }
 
-function mark(q, given, btn){
+async function aiMark(q, given){
+  const r = await fetch('/api/mark', {method:'POST', headers:{'content-type':'application/json','x-access-code':state.code||''},
+    body: JSON.stringify({question:q.q, modelAnswer:q.answer[0], studentAnswer:given, year:q.year, subject:q.subject})});
+  const j = await r.json().catch(()=>({}));
+  if(!r.ok) throw new Error(j.error || 'Marking unavailable');
+  return j;
+}
+
+async function mark(q, given, btn){
   if(session.done) return; session.done = true;
-  const ok = q.answer.some(a => norm(a) === norm(given));
+  let ok, aiFb = '';
+  if(q.type==='written'){
+    if(!String(given).trim()){ session.done=false; return; }
+    $('#sub').disabled = true; $('#fb').innerHTML = '<p class="muted">🤖 Marking…</p>';
+    try { const r = await aiMark(q, given); ok = !!r.correct; aiFb = r.feedback || ''; }
+    catch(e){ session.done=false; $('#sub').disabled=false; $('#fb').innerHTML = `<div class="fb bad">${esc(e.message)}</div>`; return; }
+  } else ok = q.answer.some(a => norm(a) === norm(given));
   const p = me(), st = p.stats[q.id] ||= {right:0,wrong:0};
   ok ? (st.right++, session.right++, p.xp += 10) : st.wrong++;
   if(q.type==='mc') app.querySelectorAll('.opt').forEach(b => { b.disabled = true;
     if(q.answer.includes(b.dataset.o)) b.classList.add('right'); else if(b===btn) b.classList.add('wrong'); });
   else { $('#ans').disabled = true; $('#sub').remove(); }
-  $('#fb').innerHTML = `<div class="fb ${ok?'good':'bad'}">${ok?'✅ Correct! +10 XP':'❌ Not quite. Answer: <b>'+esc(q.answer[0])+'</b>'}<br>${esc(q.explain||'')}</div>
+  $('#fb').innerHTML = `<div class="fb ${ok?'good':'bad'}">${ok?'✅ Correct! +10 XP':'❌ Not quite. Answer: <b>'+esc(q.answer[0])+'</b>'}<br>${esc(aiFb||q.explain||'')}</div>
     <button id="next">${session.i+1<session.qs.length?'Next':'Finish'}</button>`;
   save();
-  $('#next').onclick = () => { session.done=false; session.i++; session.i<session.qs.length ? question() : finish(); };
+  const next = () => { session.done=false; session.i++; session.i<session.qs.length ? question() : finish(); };
+  $('#next').onclick = next;
+  if(session.blitz && ok) setTimeout(() => { if(session.done && document.body.contains($('#next'))) next(); }, 700); // blitz: auto-advance on correct
 }
 
 function finish(){
@@ -100,7 +121,7 @@ function finish(){
   if(p.last !== t){ const y = new Date(Date.now()-864e5).toISOString().slice(0,10); p.streak = p.last===y ? (p.streak||0)+1 : 1; p.last = t; }
   p.xp += 20; // session bonus
   p.log.push({d:t, n:s.qs.length, right:s.right, year:s.qs[0].year}); save(); renderHud();
-  app.innerHTML = `<div class="card"><h2>Done! 🎉</h2><p>${s.right} / ${s.qs.length} correct · +20 bonus XP</p>
+  app.innerHTML = `<div class="card"><h2>Done! 🎉</h2><p>${s.blitz?`⚡ ${Math.round((Date.now()-s.t0)/1000)}s · `:''}${s.right} / ${s.qs.length} correct · +20 bonus XP</p>
   <p>🔥 ${p.streak}-day streak</p><button id="again">Practise more</button></div>`;
   $('#again').onclick = home;
 }

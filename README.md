@@ -11,6 +11,12 @@ No backend: progress is stored in the child's browser, so it hosts free anywhere
 1. Copy `tools/template.csv`, fill one row per question (`type` = `mc` or `short`; separate accepted short answers with `|`).
 2. `node tools/csv-to-json.js yourfile.csv` appends them to `data/questions.json`.
 
+## New: flashcard blitz + AI marking
+- **⚡ Flashcard blitz**: 25 rapid-fire cards, auto-advances on a correct answer, shows total time.
+- **Written answers** (`"type":"written"` in the JSON) are marked by AI via `api/mark.js`, so neither tutors nor parents mark.
+- Deploy on Vercel and set env vars `ANTHROPIC_API_KEY` and `ACCESS_CODES` (comma-separated family codes, e.g. `UPLUS-SMITH,UPLUS-NGUYEN`). The API key stays server-side. Only families with a code can use AI marking, which doubles as a simple paywall until real billing exists.
+- Multiple-choice and short answers are still marked instantly in the browser, free.
+
 ## Known limits / next steps
 - Progress lives on one device (no login, parents can't see it remotely). Next step: Supabase accounts + invite codes.
 - Auto-marking only (multiple choice / short answer). Written answers would need self-marking.
