@@ -1,4 +1,4 @@
-# U Plus Practice
+# UPlus Practice
 
 A grind-able question bank for tuition-centre families: pick a year group, subject and topic, answer 10 questions with instant marking and explanations, earn XP and streaks. Parents get a progress page. Questions the child gets wrong come up more often. A "Holiday challenge" gives a mixed 20-question set.
 

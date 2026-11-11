@@ -43,7 +43,7 @@ function home(){
   $('#go').onclick = () => start(pool().filter(q=>q.subject===sub.value && (!top.value||q.topic===top.value)), SESSION_SIZE);
   $('#holiday').onclick = () => start(pool(), 20);
   $('#blitz').onclick = () => start(pool().filter(q=>q.subject===sub.value && (!top.value||q.topic===top.value)), 25, true);
-  $('#code').onclick = () => { const c = prompt('Enter the access code from U Plus (needed for written-answer marking):', state.code||''); if(c!==null){ state.code=c.trim(); save(); home(); } };
+  $('#code').onclick = () => { const c = prompt('Enter the access code from UPlus (needed for written-answer marking):', state.code||''); if(c!==null){ state.code=c.trim(); save(); home(); } };
   $('#prog').onclick = progress; $('#sw').onclick = profileScreen;
 }
 

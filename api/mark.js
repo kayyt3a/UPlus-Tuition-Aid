@@ -4,7 +4,7 @@ module.exports = async (req, res) => {
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
   const codes = (process.env.ACCESS_CODES || '').split(',').map(s => s.trim()).filter(Boolean);
   const code = String(req.headers['x-access-code'] || '').trim();
-  if (!codes.length || !codes.includes(code)) return res.status(401).json({ error: 'Invalid or missing access code. Ask U Plus for your family code.' });
+  if (!codes.length || !codes.includes(code)) return res.status(401).json({ error: 'Invalid or missing access code. Ask UPlus for your family code.' });
   const { question, modelAnswer, studentAnswer, year, subject } = req.body || {};
   if (![question, modelAnswer, studentAnswer].every(x => typeof x === 'string' && x.length && x.length < 2000))
     return res.status(400).json({ error: 'Bad request' });
