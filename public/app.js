@@ -4,6 +4,13 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;
 let ME = null, child = null, S = null, subj = null;
 const DAILY_GOAL = 10, AVATARS = ['🦊', '🐼', '🐯', '🦄', '🐸', '🐙', '🦁', '🐨'], avatar = c => AVATARS[(c.id || 0) % AVATARS.length];
 const LS = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
+// Shrink a phone photo (often 5MB+) to a ~300KB JPEG before upload.
+async function shrink(file) {
+  const url = URL.createObjectURL(file);
+  try { const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = url; });
+    const sc = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.8); } finally { URL.revokeObjectURL(url); }
+}
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
 async function api(path, opts = {}) {
@@ -104,10 +111,12 @@ function begin(qs, mode, extra) {
 function timerTick() { if (!S || S.mode !== 'mock') return; const left = Math.ceil((S.deadline - Date.now()) / 1000), el = $('#timer');
   if (el) { el.textContent = fmt(left); el.classList.toggle('low', left < 60); } if (left <= 0) finish(true); }
 function question() {
-  const q = S.qs[S.i]; S.qStart = Date.now(); S.busy = false;
+  const q = S.qs[S.i]; S.qStart = Date.now(); S.busy = false; S.image = null;
   const body = q.type === 'mc' ? q.options.map((o, i) => `<button class="opt" data-o="${esc(o)}"><span class="k">${'ABCDEFGH'[i]}</span>${esc(o)}</button>`).join('')
-    : q.type === 'written' ? `<textarea id="ans" rows="5" placeholder="Write your answer and working here…"></textarea><button id="sub" class="block">Submit for marking</button>`
-    : `<input type="text" id="ans" class="answer-in" autocomplete="off" placeholder="Type your answer"><button id="sub" class="block">Check</button>`;
+    : q.type === 'written' ? `<div class="hint">✏️ Do your working on paper, then add a photo — or type your answer below.</div>
+      <label class="photo-btn" for="photo">📷 Take or choose a photo of your working</label><input type="file" id="photo" accept="image/*" capture="environment" hidden><div id="prev"></div>
+      <label>Typed answer ${'(optional if you add a photo)'}</label><textarea id="ans" rows="3" placeholder="Type your final answer or working here…"></textarea><button id="sub" class="block">Submit for marking</button>`
+    : `<input type="text" id="ans" class="answer-in" autocomplete="off" placeholder="Type your final answer"><div class="hint" style="margin-top:8px">✏️ Work it out on paper first, then type your final answer.</div><button id="sub" class="block">Check</button>`;
   app.innerHTML = `<div class="qtop"><button class="x" id="quit" aria-label="Quit">✕</button>
     <div class="seg">${S.qs.map((_, i) => `<i class="${i < S.i ? (S.results[i] ? 'done' : 'bad') : i === S.i ? 'cur' : ''}"></i>`).join('')}</div>
     ${S.mode === 'mock' ? `<span class="timer" id="timer">${fmt(Math.ceil((S.deadline - Date.now()) / 1000))}</span>` : `<span class="muted">${S.i + 1}/${S.qs.length}</span>`}</div>
@@ -115,14 +124,18 @@ function question() {
     <div class="q-text">${esc(q.q)}</div>${body}<div id="fb"></div></div>`;
   $('#quit').onclick = () => { if (confirm('Leave this practice? Your answers so far are saved.')) { clearInterval(S.tick); S = null; home(); } };
   if (q.type === 'mc') app.querySelectorAll('.opt').forEach(b => b.onclick = () => submit(q, b.dataset.o, b));
-  else { const i = $('#ans'); i.focus(); $('#sub').onclick = () => submit(q, i.value); if (q.type !== 'written') i.onkeydown = e => e.key === 'Enter' && submit(q, i.value); }
+  else { const i = $('#ans'); if (q.type !== 'written') i.focus(); $('#sub').onclick = () => submit(q, i.value);
+    const ph = $('#photo'); if (ph) ph.onchange = async () => { const f = ph.files[0]; if (!f) return;
+      try { S.image = await shrink(f); $('#prev').innerHTML = `<div class="prev"><img src="${S.image}" alt="Your working"><button class="x2" id="rm" type="button" aria-label="Remove photo">✕</button></div>`; $('#rm').onclick = () => { S.image = null; ph.value = ''; $('#prev').innerHTML = ''; }; }
+      catch { $('#prev').innerHTML = '<div class="err">That photo could not be opened. Try a JPEG or PNG, or type your answer.</div>'; } }; if (q.type !== 'written') i.onkeydown = e => e.key === 'Enter' && submit(q, i.value); }
 }
 async function submit(q, given, btn, selfCorrect) {
-  if (S.busy) return; if (q.type !== 'mc' && selfCorrect === undefined && !String(given).trim()) return; S.busy = true;
+  if (S.busy) return; if (q.type !== 'mc' && selfCorrect === undefined && !String(given).trim() && !(q.type === 'written' && S.image)) return; S.busy = true;
   const ms = Date.now() - S.qStart, mode = S.mode;
-  if (q.type === 'written' && selfCorrect === undefined) { const sb = $('#sub'); if (sb) sb.disabled = true; $('#fb').innerHTML = '<div class="fb neutral">🤖 Marking your answer…</div>'; }
-  let r; try { r = await api('/answer', { body: { childId: child.id, qid: q.id, given, ms, mode, mockId: S.mockId, selfCorrect } }); }
+  if (q.type === 'written' && selfCorrect === undefined) { const sb = $('#sub'); if (sb) sb.disabled = true; $('#fb').innerHTML = `<div class="fb neutral">🤖 ${S.image ? 'Reading your working…' : 'Marking your answer…'}</div>`; }
+  let r; try { r = await api('/answer', { body: { childId: child.id, qid: q.id, given, ms, mode, mockId: S.mockId, selfCorrect, image: selfCorrect === undefined && q.type === 'written' ? S.image : undefined } }); }
   catch (e) { S.busy = false; if (e.status === 402) return locked(); $('#fb').innerHTML = `<div class="fb bad">${esc(e.message)}</div>`; const sb = $('#sub'); if (sb) sb.disabled = false; return; }
+  if (r.unreadable) { S.busy = false; const sb = $('#sub'); if (sb) sb.disabled = false; $('#fb').innerHTML = `<div class="fb bad"><strong>📷 Couldn't read that photo</strong><div class="ex">${esc(r.feedback)}</div></div>`; return; }
   if (r.needsSelfMark) { S.busy = false; $('#ans').disabled = true; $('#sub').remove();
     $('#fb').innerHTML = `<div class="fb neutral"><strong>Model answer</strong><div class="ex">${esc(r.answer)}<br>${esc(r.explain || '')}</div><p class="muted">Compare with your answer. Did you get it right?</p>
       <div class="row"><button id="yes">✅ I got it</button><button class="secondary" id="no">❌ Not quite</button></div></div>`;

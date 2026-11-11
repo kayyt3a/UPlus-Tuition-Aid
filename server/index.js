@@ -30,7 +30,7 @@ function seed() {
 seed();
 
 const json = (res, code, obj, headers = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...headers }); res.end(JSON.stringify(obj)); };
-const body = req => new Promise(r => { let b = ''; req.on('data', c => { b += c; if (b.length > 1e5) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
+const body = (req, max = 1e5) => new Promise(r => { let b = ''; req.on('data', c => { b += c; if (b.length > max) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); req.on('close', () => r({})); });
 const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png' };
 
 function childFor(user, id) {
@@ -46,7 +46,7 @@ function pickQuestions(child, { year, subject, topic, n }) {
 
 async function api(req, res, url) {
   const p = url.pathname, m = req.method, user = auth.userFromCookie(req.headers.cookie);
-  const b = (m === 'POST' || m === 'PATCH') && p !== '/api/admin/import' ? await body(req) : {};
+  const b = (m === 'POST' || m === 'PATCH') && p !== '/api/admin/import' ? await body(req, p === '/api/answer' ? 7e6 : 1e5) : {};
   if (p === '/api/signup' && m === 'POST') {
     if (String(b.code || '').trim().toUpperCase() !== SIGNUP_CODE.toUpperCase()) return json(res, 403, { error: 'Invalid family code. Ask UPlus for your code.' });
     if (!/^\S+@\S+\.\S+$/.test(b.email || '') || (b.password || '').length < 8 || !(b.name || '').trim()) return json(res, 400, { error: 'Enter your name, a valid email and a password of 8+ characters.' });
@@ -137,8 +137,12 @@ async function api(req, res, url) {
     let correct, feedback = '';
     if (q.type === 'written') {
       if (typeof b.selfCorrect === 'boolean') correct = b.selfCorrect;
-      else { let r = null; try { r = await mark.aiMark(q, b.given || ''); } catch {}
-        if (!r) return json(res, 200, { needsSelfMark: true, answer: q.answer[0], explain: q.explain }); correct = r.correct; feedback = r.feedback; }
+      else { const img = mark.parseImage(b.image); if (b.image && !img) return json(res, 400, { error: 'That photo could not be used. Try taking it again.' });
+        if (!img && !String(b.given || '').trim()) return json(res, 400, { error: 'Add a photo of your working or type your answer.' });
+        let r = null; try { r = await mark.aiMark(q, b.given || '', img); } catch {}
+        if (!r) return json(res, 200, { needsSelfMark: true, answer: q.answer[0], explain: q.explain });
+        if (!r.readable) return json(res, 200, { unreadable: true, feedback: r.feedback || 'I could not read that photo. Please retake it in good light, with the whole page in view.' });
+        correct = r.correct; feedback = r.feedback; }
     } else correct = mark.markSimple(q, b.given || '');
     const ts = Date.now();
     db.prepare('INSERT INTO attempts(child_id,qid,correct,ms,mode,mock_id,day,ts) VALUES(?,?,?,?,?,?,?,?)').run(c.id, q.id, correct ? 1 : 0, Math.min(+b.ms || 0, 600000), b.mode || 'practice', b.mockId || null, today(), ts);

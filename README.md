@@ -22,6 +22,9 @@ First start seeds demo data:
 | `EXTRACT_MODEL` | model used for booklet extraction |
 | `DB_FILE` | SQLite path (default `./uplus.db`) |
 
+## Written answers: photo of working or typed answer
+For `written` questions the child can photograph their paper working (camera or gallery), type an answer, or both. The photo is shrunk in the browser, sent to Claude for marking (final answer and method), and **not stored**. If the photo is unreadable the child is asked to retake it and no attempt is recorded. Short-answer questions prompt "work it out on paper, type your final answer". Without `ANTHROPIC_API_KEY` the child self-marks against the model answer instead.
+
 ## Importing booklets (drag & drop)
 Log in as admin → **Import booklet**. Pick the year group, drop a PDF (or page photos, max 30 MB each; split long booklets). Claude extracts every question into a review queue, flagging answers it had to work out itself and questions that depend on a diagram. Edit anything, then approve; approved questions go live immediately. Needs `ANTHROPIC_API_KEY` (optional `EXTRACT_MODEL`). Always check flagged answers before approving.
 
