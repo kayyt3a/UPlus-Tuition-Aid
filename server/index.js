@@ -1,7 +1,16 @@
 const http = require('http'), fs = require('fs'), path = require('path');
 const db = require('./db'), auth = require('./auth'), mark = require('./mark'), stats = require('./stats');
-const DATA = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'questions.json'), 'utf8'));
-const QMAP = Object.fromEntries(DATA.questions.map(q => [q.id, q]));
+const BASE = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'questions.json'), 'utf8'));
+let DATA, QMAP;
+function loadQuestions() {
+  const imported = db.prepare('SELECT data FROM questions').all().map(r => JSON.parse(r.data));
+  const questions = [...BASE.questions, ...imported];
+  DATA = { yearGroups: [...new Set([...BASE.yearGroups, ...questions.map(q => q.year)])].sort(), questions };
+  QMAP = Object.fromEntries(questions.map(q => [q.id, q]));
+}
+loadQuestions();
+const extract = require('./extract');
+const rawBody = (req, max) => new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', c => { n += c.length; if (n > max) { no(new Error('File too large')); req.destroy(); } else ch.push(c); }); req.on('end', () => ok(Buffer.concat(ch))); req.on('error', no); });
 const SIGNUP_CODE = process.env.SIGNUP_CODE || 'UPLUS';
 const PUB = path.join(__dirname, '..', 'public');
 const today = () => new Date().toISOString().slice(0, 10);
@@ -37,7 +46,7 @@ function pickQuestions(child, { year, subject, topic, n }) {
 
 async function api(req, res, url) {
   const p = url.pathname, m = req.method, user = auth.userFromCookie(req.headers.cookie);
-  const b = m === 'POST' || m === 'PATCH' ? await body(req) : {};
+  const b = (m === 'POST' || m === 'PATCH') && p !== '/api/admin/import' ? await body(req) : {};
   if (p === '/api/signup' && m === 'POST') {
     if (String(b.code || '').trim().toUpperCase() !== SIGNUP_CODE.toUpperCase()) return json(res, 403, { error: 'Invalid family code. Ask UPlus for your code.' });
     if (!/^\S+@\S+\.\S+$/.test(b.email || '') || (b.password || '').length < 8 || !(b.name || '').trim()) return json(res, 400, { error: 'Enter your name, a valid email and a password of 8+ characters.' });
@@ -81,6 +90,35 @@ async function api(req, res, url) {
       let until = b.until; if (b.addWeeks) { const base = u.paid_until && u.paid_until > today() ? new Date(u.paid_until) : new Date(); until = new Date(base.getTime() + b.addWeeks * 7 * 864e5).toISOString().slice(0, 10); }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(until || '')) return json(res, 400, { error: 'Bad date' });
       db.prepare('UPDATE users SET paid_until=? WHERE id=?').run(until, u.id); return json(res, 200, { paidUntil: until });
+    }
+    if (p === '/api/admin/import' && m === 'POST') {
+      const mime = (req.headers['content-type'] || '').split(';')[0], year = url.searchParams.get('year') || '', subject = url.searchParams.get('subject') || '';
+      if (!/^(application\/pdf|image\/(png|jpeg|webp|gif))$/.test(mime)) return json(res, 400, { error: 'Upload a PDF or a PNG/JPEG image.' });
+      if (!year) return json(res, 400, { error: 'Choose a year group first.' });
+      let buf; try { buf = await rawBody(req, 30 * 1024 * 1024); } catch (e) { return json(res, 413, { error: 'File too large (max 30 MB). Split the booklet into smaller parts.' }); }
+      try {
+        const items = await extract.extract({ buffer: buf, mime, year, subject }), batch = 'b' + Date.now(), ins = db.prepare('INSERT INTO drafts(batch,data,created) VALUES(?,?,?)');
+        items.forEach((x, i) => ins.run(batch, JSON.stringify(x), Date.now() + i)); return json(res, 200, { added: items.length });
+      } catch (e) { return json(res, 502, { error: e.message }); }
+    }
+    if (p === '/api/admin/drafts' && m === 'GET') return json(res, 200, { drafts: db.prepare("SELECT id,data FROM drafts WHERE status='pending' ORDER BY created").all().map(d => ({ id: d.id, ...JSON.parse(d.data) })), years: DATA.yearGroups });
+    const approve = d => { const x = JSON.parse(d.data); const q = { id: 'imp-' + d.id, year: x.year, subject: x.subject, topic: x.topic, type: x.type, q: x.q, answer: x.answer, explain: x.explain };
+      if (x.type === 'mc') q.options = x.options; db.prepare('INSERT OR REPLACE INTO questions VALUES(?,?)').run(q.id, JSON.stringify(q)); db.prepare("UPDATE drafts SET status='approved' WHERE id=?").run(d.id); };
+    const valid = x => x.q && x.answer.length && x.answer[0] && (x.type !== 'mc' || (x.options.length >= 2 && x.options.includes(x.answer[0])));
+    if (p === '/api/admin/drafts/approve-all' && m === 'POST') {
+      let n = 0, skipped = 0; for (const d of db.prepare("SELECT * FROM drafts WHERE status='pending'").all()) { valid(JSON.parse(d.data)) ? (approve(d), n++) : skipped++; }
+      loadQuestions(); return json(res, 200, { approved: n, skipped });
+    }
+    const dm = /^\/api\/admin\/drafts\/(\d+)(?:\/(approve|reject))?$/.exec(p);
+    if (dm) {
+      const d = db.prepare("SELECT * FROM drafts WHERE id=? AND status='pending'").get(+dm[1]); if (!d) return json(res, 404, { error: 'Not found' });
+      const x = JSON.parse(d.data);
+      if (m === 'PATCH') { const bb = b; for (const k of ['year', 'subject', 'topic', 'type', 'q', 'explain']) if (typeof bb[k] === 'string') x[k] = bb[k].slice(0, 4000);
+        if (Array.isArray(bb.options)) x.options = bb.options.map(o => String(o).trim()).filter(Boolean).slice(0, 8); if (Array.isArray(bb.answer)) x.answer = bb.answer.map(a => String(a).trim()).filter(Boolean);
+        db.prepare('UPDATE drafts SET data=? WHERE id=?').run(JSON.stringify(x), d.id); return json(res, 200, { ok: 1 }); }
+      if (dm[2] === 'reject') { db.prepare("UPDATE drafts SET status='rejected' WHERE id=?").run(d.id); return json(res, 200, { ok: 1 }); }
+      if (dm[2] === 'approve') { if (!valid(x)) return json(res, 400, { error: x.type === 'mc' ? 'Multiple choice needs 2+ options and the answer must match one option exactly.' : 'Add a question and an answer first.' });
+        approve(d); loadQuestions(); return json(res, 200, { ok: 1 }); }
     }
     return json(res, 404, { error: 'Not found' });
   }

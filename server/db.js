@@ -12,5 +12,7 @@ CREATE TABLE IF NOT EXISTS attempts(id INTEGER PRIMARY KEY, child_id INTEGER NOT
 CREATE INDEX IF NOT EXISTS ix_att_child ON attempts(child_id, day);
 CREATE TABLE IF NOT EXISTS mocks(id INTEGER PRIMARY KEY, child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
   year TEXT, total INTEGER, limit_s INTEGER, started INTEGER, finished INTEGER, score INTEGER, qids TEXT);
+CREATE TABLE IF NOT EXISTS questions(id TEXT PRIMARY KEY, data TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS drafts(id INTEGER PRIMARY KEY, batch TEXT, data TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', created INTEGER NOT NULL);
 `);
 module.exports = db;

@@ -19,9 +19,13 @@ First start seeds demo data:
 | `SIGNUP_CODE` | code parents need to create an account |
 | `ANTHROPIC_API_KEY` | enables AI marking of `written` questions. Without it, children self-mark against the model answer |
 | `MARK_MODEL` | override marking model |
+| `EXTRACT_MODEL` | model used for booklet extraction |
 | `DB_FILE` | SQLite path (default `./uplus.db`) |
 
-## Adding questions
+## Importing booklets (drag & drop)
+Log in as admin → **Import booklet**. Pick the year group, drop a PDF (or page photos, max 30 MB each; split long booklets). Claude extracts every question into a review queue, flagging answers it had to work out itself and questions that depend on a diagram. Edit anything, then approve; approved questions go live immediately. Needs `ANTHROPIC_API_KEY` (optional `EXTRACT_MODEL`). Always check flagged answers before approving.
+
+## Adding questions by CSV
 Fill `tools/template.csv`, then `node tools/csv-to-json.js yourfile.csv`; restart the server. Types: `mc`, `short`, `written`. The sample questions are placeholders.
 
 ## Before real families use it

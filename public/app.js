@@ -19,11 +19,11 @@ async function boot() {
 
 function setNav(active) {
   if (!ME) { nav.innerHTML = ''; return; }
-  const u = ME.user, items = u.role === 'admin' ? [['admin', 'Families']] : [['home', '🏠 Practice'], ['mine', '📈 My progress'], ['parent', '👨‍👩‍👧 Parent dashboard']];
+  const u = ME.user, items = u.role === 'admin' ? [['admin', 'Families'], ['import', '📥 Import booklet']] : [['home', '🏠 Practice'], ['mine', '📈 My progress'], ['parent', '👨‍👩‍👧 Parent dashboard']];
   nav.innerHTML = items.map(([k, l]) => `<button data-nav="${k}" class="${k === active ? 'on' : ''}">${l}</button>`).join('') + `<button data-nav="out">Log out</button>`;
 }
 nav.onclick = e => { const k = e.target.dataset.nav; if (!k) return; S = null;
-  ({ home, mine, parent: parentView, admin, out: async () => { await api('/logout', { body: {} }); ME = null; authScreen(); } })[k](); };
+  ({ home, mine, parent: parentView, admin, import: importScreen, out: async () => { await api('/logout', { body: {} }); ME = null; authScreen(); } })[k](); };
 
 // ---------- auth ----------
 function authScreen(mode = 'login', err = '') {
@@ -175,6 +175,55 @@ async function admin() {
     <td>${f.paid ? '<span class="pill good">active</span>' : '<span class="pill bad">expired</span>'}<br>${esc(f.paid_until || 'trial')}</td>
     <td><button class="small" data-w="4" data-u="${f.id}">+4 wks</button><button class="small secondary" data-w="10" data-u="${f.id}">+10 wks</button></td></tr>`).join('')}</table>` : '<p class="muted">No families yet.</p>'}</div>`;
   app.querySelectorAll('[data-w]').forEach(b => b.onclick = async () => { await api('/admin/paid', { body: { userId: +b.dataset.u, addWeeks: +b.dataset.w } }); admin(); });
+}
+
+// ---------- booklet import (admin) ----------
+async function importScreen() {
+  setNav('import');
+  const { drafts, years } = await api('/admin/drafts');
+  app.innerHTML = `<div class="card"><h2>Import a booklet</h2>
+    <p class="muted">Drop a PDF (or page photos) here. AI extracts the questions into a review list below — nothing goes live until you approve it.</p>
+    <div class="row"><div><label>Year group</label><input type="text" id="iy" list="yl" value="${esc(LS.get('iy') || years[0] || 'Year 5')}"><datalist id="yl">${years.map(y => `<option>${y}</option>`).join('')}</datalist></div>
+    <div><label>Subject (optional)</label><input type="text" id="is" placeholder="Maths, English… or leave for AI to decide" value="${esc(LS.get('is') || '')}"></div></div>
+    <div id="drop" style="border:3px dashed var(--accent);border-radius:14px;padding:30px;text-align:center;margin-top:8px;cursor:pointer">📄 Drag & drop a booklet here, or click to choose<br><span class="muted">PDF, PNG or JPEG · up to 30 MB · long booklets: upload in parts</span></div>
+    <input type="file" id="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple hidden><div id="st" class="muted" style="margin-top:8px"></div></div>
+    <div id="queue"></div>`;
+  const drop = $('#drop'), st = $('#st');
+  const upload = async files => {
+    const year = $('#iy').value.trim(), subject = $('#is').value.trim(); LS.set('iy', year); LS.set('is', subject);
+    if (!year) return (st.textContent = 'Enter a year group first.');
+    for (const f of files) {
+      st.textContent = `⏳ Reading ${f.name}… this can take a minute or two.`;
+      try { const r = await fetch(`/api/admin/import?year=${encodeURIComponent(year)}&subject=${encodeURIComponent(subject)}`, { method: 'POST', headers: { 'content-type': f.type }, body: f });
+        const j = await r.json(); if (!r.ok) throw new Error(j.error); st.textContent = `✅ ${f.name}: ${j.added} questions found.`; }
+      catch (e) { st.innerHTML = `<span class="err">${esc(f.name)}: ${esc(e.message)}</span>`; return; }
+    }
+    importScreen();
+  };
+  drop.onclick = () => $('#file').click(); $('#file').onchange = e => upload([...e.target.files]);
+  drop.ondragover = e => { e.preventDefault(); drop.style.background = '#4f46e522'; }; drop.ondragleave = () => drop.style.background = '';
+  drop.ondrop = e => { e.preventDefault(); drop.style.background = ''; upload([...e.dataTransfer.files]); };
+  renderQueue(drafts);
+}
+function renderQueue(drafts) {
+  const el = $('#queue'); if (!drafts.length) { el.innerHTML = '<div class="card muted">No questions waiting for review.</div>'; return; }
+  const patch = (id, body) => api('/admin/drafts/' + id, { method: 'PATCH', body });
+  el.innerHTML = `<div class="card"><h2>Review (${drafts.length})</h2><p class="muted">Check each question and answer. ⚠️ flags need your eye. Approved questions appear for students straight away.</p>
+    <button id="all">Approve all (${drafts.length}) — incomplete ones are skipped</button></div>` + drafts.map(d => `<div class="card" data-id="${d.id}">
+    <div>${d.answerFromBooklet ? '' : '<span class="pill warn">⚠️ answer written by AI — check it</span> '}${d.hasFigure ? '<span class="pill warn">⚠️ has a diagram/figure</span> ' : ''}${d.page ? `<span class="pill">page ${d.page}</span>` : ''}</div>
+    <div class="row"><div><label>Subject</label><input type="text" data-k="subject" value="${esc(d.subject)}"></div><div><label>Topic</label><input type="text" data-k="topic" value="${esc(d.topic)}"></div>
+    <div><label>Type</label><select data-k="type">${['mc', 'short', 'written'].map(t => `<option ${t === d.type ? 'selected' : ''}>${t}</option>`).join('')}</select></div></div>
+    <label>Question</label><textarea data-k="q" rows="3">${esc(d.q)}</textarea>
+    <label>Options (one per line, multiple choice only)</label><textarea data-k="options" rows="3">${esc(d.options.join('\n'))}</textarea>
+    <label>Correct answer${d.type === 'mc' ? ' (must match an option exactly)' : ' (separate accepted alternatives with |)'}</label><input type="text" data-k="answer" value="${esc(d.answer.join(' | '))}">
+    <label>Explanation</label><input type="text" data-k="explain" value="${esc(d.explain)}">
+    <div class="err"></div><button class="small" data-a="approve">✅ Approve</button> <button class="small secondary" data-a="reject">🗑 Reject</button></div>`).join('');
+  el.querySelectorAll('[data-k]').forEach(i => i.onchange = () => { const id = i.closest('[data-id]').dataset.id, k = i.dataset.k, v = i.value;
+    patch(id, { [k]: k === 'options' ? v.split('\n') : k === 'answer' ? v.split('|') : v }); });
+  el.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { const c = b.closest('[data-id]'), id = c.dataset.id;
+    document.activeElement && document.activeElement.blur(); await new Promise(r => setTimeout(r, 150));
+    try { await api(`/admin/drafts/${id}/${b.dataset.a}`, { body: {} }); c.remove(); } catch (e) { c.querySelector('.err').textContent = e.message; } });
+  $('#all').onclick = async () => { const r = await api('/admin/drafts/approve-all', { body: {} }); alert(`Approved ${r.approved}.` + (r.skipped ? ` ${r.skipped} skipped — fix their answers/options first.` : '')); importScreen(); };
 }
 boot();
 })();
