@@ -3,7 +3,7 @@ window.ZH = {
   // nav & chrome
   'Practice': '练习', 'Progress': '进度', 'Parents': '家长', 'Log out': '退出登录', 'Families': '家庭', 'Questions': '题库', 'Import': '导入',
   // auth
-  'Student practice portal': '学生练习平台', 'Sign in': '登录', 'Create a family account': '创建家庭账号', 'New family': '新家庭',
+  'UPlus Ascend': '优加进阶', 'Student practice portal': '学生练习平台', 'Sign in': '登录', 'Create a family account': '创建家庭账号', 'New family': '新家庭',
   'Parent name': '家长姓名', 'Email': '邮箱', 'Password': '密码', 'Password (8+ characters)': '密码(至少8位)', 'Family code (provided by UPlus)': '家庭邀请码(由优加提供)',
   'Create account': '创建账号', 'Demo account: {x}': '演示账号:{x}',
   'Get started': '开始使用', 'Family': '家庭', 'Add your first child': '添加第一位孩子', 'Add a child': '添加孩子', 'First name': '名字', 'Year group': '年级', 'Add child': '添加', 'Cancel': '取消',

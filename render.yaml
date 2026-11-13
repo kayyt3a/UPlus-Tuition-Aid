@@ -1,7 +1,7 @@
-# Render Blueprint for UPlus Practice. Untested on Render itself: review in the dashboard before applying.
+# Render Blueprint for UPlus Ascend. Untested on Render itself: review in the dashboard before applying.
 services:
   - type: web
-    name: uplus-practice
+    name: uplus-ascend
     runtime: node
     region: singapore          # closest Render region to Perth
     plan: starter              # a persistent disk needs a paid plan (the free tier forgets all data)

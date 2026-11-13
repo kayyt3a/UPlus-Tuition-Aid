@@ -9,7 +9,7 @@ const t = (s, v) => { let r = (LANG === 'zh' && window.ZH && window.ZH[s]) || s;
 const CN = ['', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二'];
 const yl = y => { const m = LANG === 'zh' && /^Year (\d{1,2})$/.exec(y || ''); return m && CN[+m[1]] ? CN[+m[1]] + '年级' : y; };
 let cur = null; // current screen renderer, re-run when the language changes
-function applyLang() { document.documentElement.lang = LANG === 'zh' ? 'zh-Hans' : 'en'; const b = $('#lang'); if (b) b.textContent = LANG === 'zh' ? 'English' : '中文'; }
+function applyLang() { document.documentElement.lang = LANG === 'zh' ? 'zh-Hans' : 'en'; document.title = t('UPlus Ascend'); const b = $('#lang'); if (b) b.textContent = LANG === 'zh' ? 'English' : '中文'; }
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.max(0, s) % 60).padStart(2, '0')}`;
 
 // ---------- icons (one consistent line set) ----------
@@ -71,7 +71,7 @@ const today = () => new Date().toLocaleDateString(LANG === 'zh' ? 'zh-CN' : 'en-
 function authScreen(mode = 'login', err = '') {
   cur = () => authScreen(mode, ''); setNav();
   app.innerHTML = `<div class="auth">
-  <p class="eyebrow">${t('Student practice portal')}</p><h1>${mode === 'signup' ? t('Create a family account') : t('Sign in')}</h1><div class="rule"></div>
+  <p class="eyebrow">${t('UPlus Ascend')} · ${t('Student practice portal')}</p><h1>${mode === 'signup' ? t('Create a family account') : t('Sign in')}</h1><div class="rule"></div>
   <div class="tabs"><button data-m="login" class="${mode === 'login' ? 'on' : ''}">${t('Sign in')}</button><button data-m="signup" class="${mode === 'signup' ? 'on' : ''}">${t('New family')}</button></div>
   <form id="f">${mode === 'signup' ? `<label>${t('Parent name')}</label><input type="text" name="name" required>` : ''}
   <label>${t('Email')}</label><input type="email" name="email" required autocomplete="username">

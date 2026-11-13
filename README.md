@@ -1,4 +1,4 @@
-# UPlus Practice
+# UPlus Ascend (优加进阶)
 
 Question bank for UPlus Education families (Perth Modern selective-entry prep): practice, flashcard blitz, timed mock tests, AI marking of written answers, progress tracking for kids and parents, and a tutor admin page with a manual "paid until" switch.
 
