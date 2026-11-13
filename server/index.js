@@ -1,4 +1,6 @@
 const http = require('http'), fs = require('fs'), path = require('path');
+// Values pasted into hosting dashboards often carry a stray space or newline; strip them so passwords, codes and keys still work.
+for (const k of ['ADMIN_EMAIL', 'ADMIN_PASSWORD', 'SIGNUP_CODE', 'ANTHROPIC_API_KEY', 'NODE_ENV', 'DB_FILE', 'BACKUP_DIR']) if (process.env[k] != null) process.env[k] = process.env[k].trim();
 const db = require('./db'), auth = require('./auth'), mark = require('./mark'), stats = require('./stats');
 const BASE = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'questions.json'), 'utf8'));
 try { db.exec('ALTER TABLE questions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch {}
