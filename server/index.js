@@ -17,15 +17,28 @@ loadQuestions();
 const crypto = require('crypto');
 const extract = require('./extract');
 const rawBody = (req, max) => new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', c => { n += c.length; if (n > max) { no(new Error('File too large')); req.destroy(); } else ch.push(c); }); req.on('end', () => ok(Buffer.concat(ch))); req.on('error', no); });
+const PROD = process.env.NODE_ENV === 'production', SECURE = PROD || process.env.COOKIE_SECURE === '1';
+if (PROD && (!process.env.SIGNUP_CODE || !process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD)) { console.error('Refusing to start in production: set SIGNUP_CODE, ADMIN_EMAIL and ADMIN_PASSWORD.'); process.exit(1); }
 const SIGNUP_CODE = process.env.SIGNUP_CODE || 'UPLUS';
+const zlib = require('zlib');
+// Small in-memory rate limiter (per process; fine for a single instance).
+const hits = new Map();
+function limited(key, max, windowMs) { if (process.env.RATE_LIMIT === 'off') return false; const now = Date.now(); let h = hits.get(key); if (!h || h.reset < now) { h = { n: 0, reset: now + windowMs }; hits.set(key, h); } return ++h.n > max; }
+setInterval(() => { const now = Date.now(); for (const [k, h] of hits) if (h.reset < now) hits.delete(k); }, 60000).unref();
+const clientIp = req => process.env.TRUST_PROXY ? String(req.headers['x-forwarded-for'] || '').split(',').pop().trim() || req.socket.remoteAddress : req.socket.remoteAddress; // behind one proxy, the last entry is the one the proxy added
+const cookieFlags = (maxAge) => `HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${SECURE ? '; Secure' : ''}`;
+const TOO_MANY = 'Too many attempts. Please wait a few minutes and try again.';
 const PUB = path.join(__dirname, '..', 'public');
 const today = () => new Date().toISOString().slice(0, 10);
 const strip = ({ answer, explain, ...q }) => q;
 
 function seed() {
   if (db.prepare('SELECT COUNT(*) c FROM users').get().c) return;
-  auth.createUser('admin@uplus.test', 'UPlus Admin', 'admin123', 'admin');
-  const pid = auth.createUser('parent@uplus.test', 'Demo Parent', 'parent123', 'parent', new Date(Date.now() + 28 * 864e5).toISOString().slice(0, 10));
+  if (process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD) { // real deployment: create only the admin you specify, no demo data
+    if (process.env.ADMIN_PASSWORD.length < 10) { console.error('ADMIN_PASSWORD must be at least 10 characters.'); process.exit(1); }
+    auth.createUserSync(process.env.ADMIN_EMAIL, 'UPlus Admin', process.env.ADMIN_PASSWORD, 'admin'); console.log('Created admin account for ' + process.env.ADMIN_EMAIL); return; }
+  auth.createUserSync('admin@uplus.test', 'UPlus Admin', 'admin123', 'admin');
+  const pid = auth.createUserSync('parent@uplus.test', 'Demo Parent', 'parent123', 'parent', new Date(Date.now() + 28 * 864e5).toISOString().slice(0, 10));
   const cid = db.prepare('INSERT INTO children(user_id,name,year) VALUES(?,?,?)').run(pid, 'Mia', 'Year 5').lastInsertRowid;
   const qs = DATA.questions.filter(q => q.year === 'Year 5' || q.year === 'Year 4');
   const ins = db.prepare('INSERT INTO attempts(child_id,qid,correct,ms,mode,day,ts) VALUES(?,?,?,?,?,?,?)');
@@ -34,6 +47,7 @@ function seed() {
   console.log('Seeded demo data: admin@uplus.test/admin123, parent@uplus.test/parent123');
 }
 seed();
+const DEMO = !!db.prepare("SELECT 1 FROM users WHERE email='parent@uplus.test'").get(); // shows the demo-login hint only on demo databases
 
 const json = (res, code, obj, headers = {}) => { res.writeHead(code, { 'content-type': 'application/json', ...headers }); res.end(JSON.stringify(obj)); };
 const body = (req, max = 1e5) => new Promise(r => { let b = ''; req.on('data', c => { b += c; if (b.length > max) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); req.on('close', () => r({})); });
@@ -53,17 +67,21 @@ function pickQuestions(child, { year, subject, topic, n }) {
 async function api(req, res, url) {
   const p = url.pathname, m = req.method, user = auth.userFromCookie(req.headers.cookie);
   const b = (m === 'POST' || m === 'PATCH') && p !== '/api/admin/import' ? await body(req, p === '/api/answer' ? 7e6 : 1e5) : {};
+  if (p === '/api/config') return json(res, 200, { demo: DEMO });
   if (p === '/api/signup' && m === 'POST') {
+    if (limited('su:' + clientIp(req), 15, 3600e3)) return json(res, 429, { error: TOO_MANY });
     if (String(b.code || '').trim().toUpperCase() !== SIGNUP_CODE.toUpperCase()) return json(res, 403, { error: 'Invalid family code. Ask UPlus for your code.' });
     if (!/^\S+@\S+\.\S+$/.test(b.email || '') || (b.password || '').length < 8 || !(b.name || '').trim()) return json(res, 400, { error: 'Enter your name, a valid email and a password of 8+ characters.' });
-    try { const id = auth.createUser(b.email, b.name, b.password); return json(res, 200, { ok: 1 }, { 'set-cookie': `sid=${auth.newSession(id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000` }); }
+    try { const id = await auth.createUser(b.email, b.name, b.password); return json(res, 200, { ok: 1 }, { 'set-cookie': `sid=${auth.newSession(id)}; ${cookieFlags(2592000)}` }); }
     catch { return json(res, 409, { error: 'That email already has an account.' }); }
   }
   if (p === '/api/login' && m === 'POST') {
-    const u = auth.checkLogin(b.email, b.password || '');
-    return u ? json(res, 200, { ok: 1 }, { 'set-cookie': `sid=${auth.newSession(u.id)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000` }) : json(res, 401, { error: 'Wrong email or password.' });
+    const ip = clientIp(req);
+    if (limited('lg:' + ip, 60, 600e3) || limited('lge:' + String(b.email || '').toLowerCase().slice(0, 80), 10, 600e3)) return json(res, 429, { error: TOO_MANY });
+    const u = await auth.checkLogin(b.email, b.password || '');
+    return u ? json(res, 200, { ok: 1 }, { 'set-cookie': `sid=${auth.newSession(u.id)}; ${cookieFlags(2592000)}` }) : json(res, 401, { error: 'Wrong email or password.' });
   }
-  if (p === '/api/logout') { auth.endSession(req.headers.cookie); return json(res, 200, { ok: 1 }, { 'set-cookie': 'sid=; Path=/; Max-Age=0' }); }
+  if (p === '/api/logout') { auth.endSession(req.headers.cookie); return json(res, 200, { ok: 1 }, { 'set-cookie': `sid=; ${cookieFlags(0)}` }); }
   if (!user) return json(res, 401, { error: 'Please log in.' });
 
   if (p === '/api/me') {
@@ -87,8 +105,10 @@ async function api(req, res, url) {
   if (p.startsWith('/api/admin/')) {
     if (user.role !== 'admin') return json(res, 403, { error: 'Admins only' });
     if (p === '/api/admin/families') {
-      const fams = db.prepare("SELECT id,name,email,paid_until,created FROM users WHERE role='parent' ORDER BY created DESC").all().map(f => ({ ...f, paid: !!auth.isPaid({ ...f, role: 'parent' }),
-        children: db.prepare('SELECT id,name,year FROM children WHERE user_id=?').all(f.id).map(c => ({ ...c, total: db.prepare('SELECT COUNT(*) n FROM attempts WHERE child_id=?').get(c.id).n, week: stats(c.id, QMAP).week })) }));
+      const weekAgo = new Date(Date.now() - 6 * 864e5).toISOString().slice(0, 10), agg = {};
+      db.prepare('SELECT child_id, COUNT(*) n, SUM(day >= ?) w, MAX(day) last FROM attempts GROUP BY child_id').all(weekAgo).forEach(r => agg[r.child_id] = r);
+      const kids = {}; db.prepare('SELECT id,user_id,name,year FROM children').all().forEach(c => (kids[c.user_id] ||= []).push({ id: c.id, name: c.name, year: c.year, total: (agg[c.id] || {}).n || 0, week: (agg[c.id] || {}).w || 0, last: (agg[c.id] || {}).last || null }));
+      const fams = db.prepare("SELECT id,name,email,paid_until,created FROM users WHERE role='parent' ORDER BY created DESC").all().map(f => ({ ...f, paid: !!auth.isPaid({ ...f, role: 'parent' }), children: kids[f.id] || [] }));
       return json(res, 200, { families: fams, signupCode: SIGNUP_CODE });
     }
     if (p === '/api/admin/paid' && m === 'POST') {
@@ -166,7 +186,8 @@ async function api(req, res, url) {
       if (typeof b.selfCorrect === 'boolean') correct = b.selfCorrect;
       else { const img = mark.parseImage(b.image); if (b.image && !img) return json(res, 400, { error: 'That photo could not be used. Try taking it again.' });
         if (!img && !String(b.given || '').trim()) return json(res, 400, { error: 'Add a photo of your working or type your answer.' });
-        let r = null; try { r = await mark.aiMark(q, b.given || '', img, b.lang === 'zh' ? 'zh' : 'en'); } catch {}
+        if (limited('ai:' + c.id, 40, 60e3)) return json(res, 429, { error: 'You are submitting very quickly. Please wait a moment and try again.' });
+        let r = null; try { r = await mark.aiMark(q, b.given || '', img, b.lang === 'zh' ? 'zh' : 'en'); } catch (e) { if (e.busy) return json(res, 503, { error: 'Server is busy marking other answers. Please try again in a moment.' }); }
         if (!r) return json(res, 200, { needsSelfMark: true, answer: q.answer[0], explain: q.explain });
         if (!r.readable) return json(res, 200, { unreadable: true, feedback: r.feedback || 'I could not read that photo. Please retake it in good light, with the whole page in view.' });
         correct = r.correct; feedback = r.feedback; }
@@ -193,13 +214,31 @@ async function api(req, res, url) {
   return json(res, 404, { error: 'Not found' });
 }
 
-http.createServer(async (req, res) => {
+const cache = new Map();
+function sendStatic(req, res, f) {
+  const st = fs.statSync(f); let e = cache.get(f);
+  if (!e || e.mtime !== st.mtimeMs) { const raw = fs.readFileSync(f); e = { mtime: st.mtimeMs, raw, etag: '"' + crypto.createHash('sha1').update(raw).digest('hex').slice(0, 16) + '"', gz: /\.(html|js|css|svg)$/.test(f) ? zlib.gzipSync(raw) : null }; cache.set(f, e); }
+  if (req.headers['if-none-match'] === e.etag) { res.writeHead(304, { etag: e.etag }); return res.end(); }
+  const gz = e.gz && /\bgzip\b/.test(req.headers['accept-encoding'] || '');
+  res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', etag: e.etag, 'cache-control': 'no-cache', vary: 'Accept-Encoding', ...(gz ? { 'content-encoding': 'gzip' } : {}) });
+  res.end(gz ? e.gz : e.raw);
+}
+const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
+    if (url.pathname === '/healthz') { db.prepare('SELECT 1').get(); return json(res, 200, { ok: 1 }); }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     let f = path.join(PUB, url.pathname === '/' ? 'index.html' : url.pathname);
     if (!f.startsWith(PUB) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) f = path.join(PUB, 'index.html');
-    res.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream', 'cache-control': 'no-cache' });
-    fs.createReadStream(f).pipe(res);
-  } catch (e) { console.error(e); json(res, 500, { error: 'Server error' }); }
-}).listen(process.env.PORT || 3000, () => console.log('UPlus running on http://localhost:' + (process.env.PORT || 3000)));
+    sendStatic(req, res, f);
+  } catch (e) { console.error(e); if (!res.headersSent) json(res, 500, { error: 'Server error' }); }
+});
+server.listen(process.env.PORT || 3000, () => console.log('UPlus running on http://localhost:' + (process.env.PORT || 3000)));
+
+// ---- housekeeping: expired sessions, nightly backups, clean shutdown
+const BACKUP_DIR = process.env.BACKUP_DIR || path.join(__dirname, '..', 'backups');
+function backup() { try { fs.mkdirSync(BACKUP_DIR, { recursive: true }); const f = path.join(BACKUP_DIR, `uplus-${today()}.db`);
+  if (!fs.existsSync(f)) db.exec(`VACUUM INTO '${f.replace(/'/g, "''")}'`);
+  fs.readdirSync(BACKUP_DIR).filter(x => /^uplus-.*\.db$/.test(x)).sort().slice(0, -7).forEach(x => fs.unlinkSync(path.join(BACKUP_DIR, x))); } catch (e) { console.error('backup failed:', e.message); } }
+setInterval(() => { try { auth.purgeSessions(); } catch {} backup(); }, 6 * 3600e3).unref(); setTimeout(backup, 60e3).unref();
+for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => { server.close(() => { try { db.exec('PRAGMA wal_checkpoint(TRUNCATE)'); } catch {} process.exit(0); }); setTimeout(() => process.exit(0), 8000).unref(); });

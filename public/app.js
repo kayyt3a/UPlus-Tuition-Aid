@@ -1,7 +1,7 @@
 (() => {
 const $ = s => document.querySelector(s), app = $('#app'), nav = $('#nav');
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-let ME = null, child = null, S = null, subj = null;
+let CFG = {}, ME = null, child = null, S = null, subj = null;
 const DAILY_GOAL = 10;
 const LS = { get: k => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch {} } };
 let LANG = LS.get('lang') || ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
@@ -41,6 +41,7 @@ async function api(path, opts = {}) {
   return j;
 }
 async function boot() {
+  try { CFG = await (await fetch('/api/config')).json(); } catch { CFG = {}; }
   try { ME = await api('/me'); } catch { ME = null; }
   if (!ME) return authScreen();
   const saved = +LS.get('child'); child = ME.children.find(c => c.id === saved) || ME.children[0] || null;
@@ -77,7 +78,7 @@ function authScreen(mode = 'login', err = '') {
   <label>${mode === 'signup' ? t('Password (8+ characters)') : t('Password')}</label><input type="password" name="password" required autocomplete="${mode === 'signup' ? 'new-password' : 'current-password'}">
   ${mode === 'signup' ? `<label>${t('Family code (provided by UPlus)')}</label><input type="text" name="code" required>` : ''}
   <div class="err">${esc(err)}</div><button class="btn block" style="margin-top:8px">${mode === 'signup' ? t('Create account') : t('Sign in')}</button></form>
-  ${mode === 'login' ? `<p class="muted" style="margin-top:14px">${t('Demo account: {x}', { x: 'parent@uplus.test / parent123' })}</p>` : ''}
+  ${mode === 'login' && CFG.demo ? `<p class="muted" style="margin-top:14px">${t('Demo account: {x}', { x: 'parent@uplus.test / parent123' })}</p>` : ''}
   <div class="brandfoot">${valuesHtml()}</div></div>`;
   app.querySelectorAll('[data-m]').forEach(b => b.onclick = () => authScreen(b.dataset.m));
   $('#f').onsubmit = async e => { e.preventDefault(); const body = Object.fromEntries(new FormData(e.target));

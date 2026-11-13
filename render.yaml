@@ -1,0 +1,33 @@
+# Render Blueprint for UPlus Practice. Untested on Render itself: review in the dashboard before applying.
+services:
+  - type: web
+    name: uplus-practice
+    runtime: node
+    region: singapore          # closest Render region to Perth
+    plan: starter              # a persistent disk needs a paid plan (the free tier forgets all data)
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    disk:
+      name: uplus-data
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: NODE_VERSION      # node:sqlite needs Node 22.5+
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DB_FILE
+        value: /var/data/uplus.db
+      - key: BACKUP_DIR
+        value: /var/data/backups
+      - key: TRUST_PROXY       # Render adds the real client address to X-Forwarded-For
+        value: "1"
+      - key: ADMIN_EMAIL       # creates your admin on first start (no demo accounts in production)
+        sync: false
+      - key: ADMIN_PASSWORD    # 10+ characters
+        sync: false
+      - key: SIGNUP_CODE       # families need this to create an account
+        sync: false
+      - key: ANTHROPIC_API_KEY # booklet extraction + AI marking
+        sync: false

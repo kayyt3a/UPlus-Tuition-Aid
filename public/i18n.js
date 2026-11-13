@@ -66,5 +66,5 @@ window.ZH = {
   'That photo could not be used. Try taking it again.': '无法使用该照片,请重新拍摄。', 'I could not read that photo. Please retake it in good light, with the whole page in view.': '无法识别该图片。请在光线充足的地方重新拍摄,并确保整页入镜;手写请写大一些、清晰一些。',
   'Multiple choice needs 2+ options and the answer must match one option exactly.': '选择题至少需要2个选项,且答案必须与某个选项完全一致。', 'Add a question and an answer first.': '请先填写题目和答案。',
   'Year group, subject and topic are required.': '年级、科目和专题为必填项。', 'Choose a year group first.': '请先选择年级。', 'Upload a PDF or a PNG/JPEG image.': '请上传 PDF 或 PNG/JPEG 图片。',
-  'Something went wrong': '出错了,请重试。', 'Enter a name and year group.': '请填写名字并选择年级。', 'Not found': '未找到。', 'No such family': '没有找到该家庭。'
+  'Too many attempts. Please wait a few minutes and try again.': '尝试次数过多,请稍等几分钟后再试。', 'You are submitting very quickly. Please wait a moment and try again.': '提交过快,请稍等片刻再试。', 'Server is busy marking other answers. Please try again in a moment.': '服务器正忙于批改,请稍后再试。', 'Something went wrong': '出错了,请重试。', 'Enter a name and year group.': '请填写名字并选择年级。', 'Not found': '未找到。', 'No such family': '没有找到该家庭。'
 };

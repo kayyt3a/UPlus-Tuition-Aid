@@ -14,7 +14,7 @@ exports.extract = async ({ buffer, mime, year, subject }) => {
   const isPdf = mime === 'application/pdf';
   const block = { type: isPdf ? 'document' : 'image', source: { type: 'base64', media_type: mime, data: buffer.toString('base64') } };
   const r = await fetch((process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com') + '/v1/messages', {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
+    method: 'POST', signal: AbortSignal.timeout(10 * 60e3), headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: process.env.EXTRACT_MODEL || 'claude-sonnet-5-5', max_tokens: 32000,
       messages: [{ role: 'user', content: [block, { type: 'text', text: `${PROMPT}\nYear group: ${year}${subject ? `\nSubject: ${subject}` : ''}` }] }] })
   });

@@ -15,6 +15,21 @@ First start seeds demo data:
 - Admin (tutor): `admin@uplus.test` / `admin123`
 - New families sign up with the family code (default `UPLUS`, set `SIGNUP_CODE` to change) and get a 7-day free trial.
 
+## Deploying (Render) and capacity
+**Render steps:** push the repo, create a *Blueprint* from `render.yaml` (or a Web Service with the same settings), then enter `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SIGNUP_CODE` and `ANTHROPIC_API_KEY` when asked. Open the URL and sign in as that admin. In production the app refuses to start without those settings and creates **no demo accounts**.
+- The free Render tier has no persistent disk and sleeps when idle, so data would be lost. Use a paid plan with the disk attached (the blueprint does this). A service with a disk is a single instance and redeploys cause a brief pause.
+- Data is one SQLite file on the disk. The app writes a consistent copy every night to `BACKUP_DIR` (keeps 7). Also turn on Render's disk snapshots, and download a backup off-site occasionally.
+- `GET /healthz` is the health check.
+
+**Measured capacity** (load test on a 4-core dev machine, then again with the server limited to one core, as a rough stand-in for a small instance):
+| | 4 cores | 1 core |
+|---|---|---|
+| 150 students answering non-stop | ~2,700 req/s, p95 70 ms | ~3,100 req/s, p95 63 ms |
+| 300 families signing up | p95 0.2 s | p95 0.8 s |
+| 200 logins in the same instant | p95 1.7 s | p95 6.8 s |
+| Admin families page, 300 families, 900k saved answers | 0.12 s | n/a |
+Real students pause to think, so 150 non-stop students is far heavier than 150 real ones. The practical ceilings are AI cost/rate limits (handwriting marking is capped at 6 simultaneous calls with a queue) and the single-instance design. Plan to move to Postgres if you outgrow roughly several thousand active students or need zero-downtime deploys. Not yet tested on Render itself, over a real network, or with a real AI key.
+
 ## Environment variables
 | Var | Purpose |
 |---|---|
@@ -23,6 +38,12 @@ First start seeds demo data:
 | `ANTHROPIC_API_KEY` | enables AI marking of `written` questions. Without it, children self-mark against the model answer |
 | `MARK_MODEL` | override marking model |
 | `EXTRACT_MODEL` | model used for booklet extraction |
+| `NODE_ENV=production` | requires `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `SIGNUP_CODE`; secure cookies; no demo data |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | create the admin on first start of an empty database |
+| `TRUST_PROXY` | set to `1` behind a proxy such as Render so rate limits use the real client address |
+| `BACKUP_DIR` | nightly SQLite backups (default `./backups`) |
+| `AI_CONCURRENCY` | max simultaneous AI calls (default 6) |
+| `RATE_LIMIT=off` | disables login/signup rate limits (load testing only) |
 | `DB_FILE` | SQLite path (default `./uplus.db`) |
 
 ## Answering by hand: photo, writing pad or typing
