@@ -42,15 +42,15 @@ window.ZH = {
   // admin
   'Administration': '管理后台', 'Signup code for new families: ': '新家庭注册码:', 'Children (week / total)': '孩子(本周/累计)', 'Access': '状态', 'Active': '有效', 'Expired': '已过期', 'Trial': '试用',
   '+4 weeks': '+4周', '+10 weeks': '+10周', 'No families have signed up yet.': '暂无家庭注册。',
-  'Import a booklet': '导入练习册', 'Drop a PDF or page photos. Questions are extracted into a review list; nothing goes live until you approve it.': '上传 PDF 或页面照片,系统会提取题目并放入审核列表;在您批准之前不会向学生显示。',
+  'Import a booklet': '导入练习册', 
   'Subject (optional)': '科目(可选)', 'Maths, English… or leave blank': '数学、英语…或留空', 'Drag and drop a booklet here, or click to choose': '将练习册拖到此处,或点击选择文件',
   'PDF, PNG or JPEG · up to 30 MB · upload long booklets in parts': 'PDF、PNG 或 JPEG · 最大 30 MB · 较长的练习册请分段上传', 'Reading {f}… this can take a minute or two.': '正在读取 {f}…可能需要一两分钟。',
-  '{f}: {n} questions found.': '{f}:找到 {n} 道题。', 'Enter a year group first.': '请先填写年级。', 'Review ({n})': '审核({n})',
-  'Check each question and answer. Flagged items need your attention. Approved questions are available to students immediately.': '请逐题核对题目与答案。带标记的需要特别留意。批准后的题目会立即向学生开放。',
-  'Approve all ({n}); incomplete ones are skipped': '全部批准({n});不完整的将被跳过', 'Answer written by AI: check it': '答案由 AI 生成,请核对', 'Refers to a diagram': '涉及图表', 'Page {n}': '第 {n} 页',
+  'Enter a year group first.': '请先填写年级。', 
+  
+  'Answer written by AI: check it': '答案由 AI 生成,请核对', 'Refers to a diagram': '涉及图表', 'Page {n}': '第 {n} 页',
   'Question type': '题型', 'Question': '题目', 'Options (one per line, multiple choice only)': '选项(每行一个,仅选择题)', 'Correct answer': '正确答案', ' (must match an option exactly)': '(必须与某个选项完全一致)',
-  ' (separate accepted alternatives with |)': '(可接受的其他答案用 | 分隔)', 'Explanation': '解析', 'Approve': '批准', 'Reject': '拒绝', 'No questions are waiting for review.': '没有待审核的题目。',
-  'Approved {n}.': '已批准 {n} 道。', ' {n} skipped; fix their answers or options first.': ' 另有 {n} 道已跳过,请先补全答案或选项。',
+  ' (separate accepted alternatives with |)': '(可接受的其他答案用 | 分隔)', 'Explanation': '解析', 
+  
   // question bank
   'Question bank': '题库', 'Add a question': '添加题目', 'Add question': '添加题目', 'Search questions': '搜索题目', 'All years': '全部年级', 'All subjects': '全部科目', '{n} questions': '共 {n} 道题',
   'Showing the first {n}. Use the filters to narrow down.': '仅显示前 {n} 道,请用筛选缩小范围。', 'Edit': '编辑', 'Delete': '删除', 'Save': '保存', 'Save question': '保存题目',
@@ -66,5 +66,18 @@ window.ZH = {
   'That photo could not be used. Try taking it again.': '无法使用该照片,请重新拍摄。', 'I could not read that photo. Please retake it in good light, with the whole page in view.': '无法识别该图片。请在光线充足的地方重新拍摄,并确保整页入镜;手写请写大一些、清晰一些。',
   'Multiple choice needs 2+ options and the answer must match one option exactly.': '选择题至少需要2个选项,且答案必须与某个选项完全一致。', 'Add a question and an answer first.': '请先填写题目和答案。',
   'Year group, subject and topic are required.': '年级、科目和专题为必填项。', 'Choose a year group first.': '请先选择年级。', 'Upload a PDF or a PNG/JPEG image.': '请上传 PDF 或 PNG/JPEG 图片。',
-  'Too many attempts. Please wait a few minutes and try again.': '尝试次数过多,请稍等几分钟后再试。', 'You are submitting very quickly. Please wait a moment and try again.': '提交过快,请稍等片刻再试。', 'Server is busy marking other answers. Please try again in a moment.': '服务器正忙于批改,请稍后再试。', 'Something went wrong': '出错了,请重试。', 'Enter a name and year group.': '请填写名字并选择年级。', 'Not found': '未找到。', 'No such family': '没有找到该家庭。'
+  'Too many attempts. Please wait a few minutes and try again.': '尝试次数过多,请稍等几分钟后再试。', 'You are submitting very quickly. Please wait a moment and try again.': '提交过快,请稍等片刻再试。', 'Server is busy marking other answers. Please try again in a moment.': '服务器正忙于批改,请稍后再试。', 'Something went wrong': '出错了,请重试。', 'Enter a name and year group.': '请填写名字并选择年级。', 'Not found': '未找到。', 'No such family': '没有找到该家庭。',
+  'Drop a PDF or page photos. Only the questions are kept, and they go live for students straight away. Read over them below and fix anything that needs it.': '拖入 PDF 或页面照片。系统只保留题目,并立即向学生开放。请在下方检查并修正需要调整的题目。',
+  'Imported booklets': '已导入的讲义', 'No booklets imported yet.': '还没有导入任何讲义。', '{n} to check': '{n} 道待检查', 'Open': '打开', 'Earlier import': '早前导入',
+  'Imported booklet': '已导入讲义', 'All booklets': '全部讲义',
+  'These questions are live for students. Read over them and fix anything that needs it.': '这些题目已向学生开放。请检查并修正需要调整的地方。',
+  'All questions ({n})': '全部题目({n})', 'Only marked ({n})': '仅看带标记的({n})', 'Incomplete: hidden from students until fixed': '不完整:修正前不向学生显示',
+  'Answer': '答案', 'Answer is correct': '答案无误', 'Remove': '移除',
+  'Remove this question? Students will no longer see it, but past results are kept.': '要移除这道题吗?学生将不再看到它,但以往的答题记录会保留。',
+  'Nothing marked in this booklet.': '这份讲义没有带标记的题目。', 'This booklet has no questions left.': '这份讲义已没有题目。',
+  '{n} questions added. They are live for students now.': '已添加 {n} 道题,学生现在即可练习。', '{n} are incomplete and hidden from students until you fix them.': '其中 {n} 道不完整,修正前不会向学生显示。',
+  'No questions were found in this file.': '这个文件中没有找到题目。',
+  'AI extraction needs ANTHROPIC_API_KEY set on the server.': '服务器需要设置 ANTHROPIC_API_KEY 才能使用 AI 提取题目。',
+  'Could not read the AI response. Try a smaller file or fewer pages.': '无法读取 AI 的回复。请尝试更小的文件或更少的页数。',
+  'File too large (max 30 MB). Split the booklet into smaller parts.': '文件太大(最大 30 MB)。请把讲义拆分成几部分上传。',
 };

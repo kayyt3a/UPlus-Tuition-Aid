@@ -327,52 +327,68 @@ async function qbank() {
     row.querySelector('[data-a=edit]').onclick = () => { row.innerHTML = `<div style="width:100%">${qForm(byId[id])}</div>`; wireForm(row, async d => { await api('/admin/questions/' + id, { method: 'PATCH', body: d }); qbank(); }, qbank); }; });
 }
 
-// ---------- admin: booklet import ----------
-async function importScreen() {
+// ---------- admin: booklet import (questions go live straight away; the admin reads over and edits them) ----------
+let IMP = { batch: null, filter: 'all', note: '' };
+const when = ms => new Date(ms).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : 'en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+const bookletName = n => n === 'Earlier import' ? t('Earlier import') : n;
+async function importScreen(err) {
   cur = importScreen; setNav('import');
-  const { drafts, years } = await api('/admin/drafts');
-  app.innerHTML = `<div class="head"><p class="eyebrow">${t('Administration')}</p><h1>${t('Import a booklet')}</h1><p class="muted" style="margin-top:6px">${t('Drop a PDF or page photos. Questions are extracted into a review list; nothing goes live until you approve it.')}</p></div>
+  const { imports, years } = await api('/admin/imports');
+  app.innerHTML = `<div class="head"><p class="eyebrow">${t('Administration')}</p><h1>${t('Import a booklet')}</h1><p class="muted" style="margin-top:6px">${t('Drop a PDF or page photos. Only the questions are kept, and they go live for students straight away. Read over them below and fix anything that needs it.')}</p></div>
     <div class="panel"><div class="row"><div><label style="margin-top:0">${t('Year group')}</label><input type="text" id="iy" list="yl" value="${esc(LS.get('iy') || years[0] || 'Year 5')}"><datalist id="yl">${years.map(y => `<option>${esc(y)}</option>`).join('')}</datalist></div>
     <div><label style="margin-top:0">${t('Subject (optional)')}</label><input type="text" id="is" placeholder="${t('Maths, English… or leave blank')}" value="${esc(LS.get('is') || '')}"></div></div>
     <div id="drop" class="drop">${ico('upload')}<br>${t('Drag and drop a booklet here, or click to choose')}<br><span class="muted">${t('PDF, PNG or JPEG · up to 30 MB · upload long booklets in parts')}</span></div>
-    <input type="file" id="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple hidden><div id="st" class="muted" style="margin-top:10px"></div></div>
-    <div id="queue"></div>`;
+    <input type="file" id="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple hidden><div id="st" class="muted" style="margin-top:10px">${typeof err === 'string' ? `<span class="err">${esc(err)}</span>` : ''}</div></div>
+    <div class="panel blist"><h2>${t('Imported booklets')}</h2>${imports.length ? imports.map(i => `<div class="brow"><div><b>${esc(bookletName(i.name))}</b><div class="muted">${esc(when(i.created))} · ${esc(yl(i.year))} · ${t('{n} questions', { n: i.count })}</div></div>
+      <div class="bact">${i.marked ? `<span class="tag warn">${t('{n} to check', { n: i.marked })}</span>` : ''}<button class="btn small secondary" data-b="${esc(i.batch)}">${t('Open')}</button></div></div>`).join('') : `<p class="empty">${t('No booklets imported yet.')}</p>`}</div>`;
   const drop = $('#drop'), st = $('#st');
   const upload = async files => {
     const year = $('#iy').value.trim(), subject = $('#is').value.trim(); LS.set('iy', year); LS.set('is', subject);
     if (!year) return (st.textContent = t('Enter a year group first.'));
+    let last = null, added = 0, fix = 0;
     for (const f of files) {
       st.textContent = t('Reading {f}… this can take a minute or two.', { f: f.name });
-      try { const r = await fetch(`/api/admin/import?year=${encodeURIComponent(year)}&subject=${encodeURIComponent(subject)}`, { method: 'POST', headers: { 'content-type': f.type }, body: f });
-        const j = await r.json(); if (!r.ok) throw new Error(t(j.error)); st.textContent = t('{f}: {n} questions found.', { f: f.name, n: j.added }); }
-      catch (e) { st.innerHTML = `<span class="err">${esc(f.name)}: ${esc(e.message)}</span>`; return; }
+      try { const r = await fetch('/api/admin/import?' + new URLSearchParams({ year, subject, name: f.name }), { method: 'POST', headers: { 'content-type': f.type }, body: f });
+        const j = await r.json(); if (!r.ok) throw new Error(t(j.error)); last = j.batch; added += j.added; fix += j.needsFix; }
+      catch (e) { return importScreen(`${f.name}: ${e.message}`); }
     }
+    if (files.length === 1 && last) { IMP = { batch: last, filter: 'all', note: t('{n} questions added. They are live for students now.', { n: added }) + (fix ? ' ' + t('{n} are incomplete and hidden from students until you fix them.', { n: fix }) : '') }; return bookletView(last); }
     importScreen();
   };
   drop.onclick = () => $('#file').click(); $('#file').onchange = e => upload([...e.target.files]);
   drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); }; drop.ondragleave = () => drop.classList.remove('over');
   drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); upload([...e.dataTransfer.files]); };
-  renderQueue(drafts);
+  app.querySelectorAll('[data-b]').forEach(b => b.onclick = () => bookletView(b.dataset.b));
 }
-function renderQueue(drafts) {
-  const el = $('#queue'); if (!drafts.length) { el.innerHTML = `<p class="empty">${t('No questions are waiting for review.')}</p>`; return; }
-  const patch = (id, body) => api('/admin/drafts/' + id, { method: 'PATCH', body });
-  el.innerHTML = `<div class="panel"><h2>${t('Review ({n})', { n: drafts.length })}</h2><p class="muted">${t('Check each question and answer. Flagged items need your attention. Approved questions are available to students immediately.')}</p>
-    <button class="btn" id="all">${t('Approve all ({n}); incomplete ones are skipped', { n: drafts.length })}</button></div>` + drafts.map(d => `<div class="panel" data-id="${d.id}">
-    <div style="margin-bottom:6px">${d.answerFromBooklet ? '' : `<span class="tag warn">${t('Answer written by AI: check it')}</span> `}${d.hasFigure ? `<span class="tag warn">${t('Refers to a diagram')}</span> ` : ''}${d.page ? `<span class="tag">${t('Page {n}', { n: d.page })}</span>` : ''}</div>
-    <div class="row"><div><label>${t('Subject')}</label><input type="text" data-k="subject" value="${esc(d.subject)}"></div><div><label>${t('Topic')}</label><input type="text" data-k="topic" value="${esc(d.topic)}"></div>
-    <div><label>${t('Question type')}</label><select data-k="type">${['mc', 'short', 'written'].map(x => `<option ${x === d.type ? 'selected' : ''}>${x}</option>`).join('')}</select></div></div>
-    <label>${t('Question')}</label><textarea data-k="q" rows="3">${esc(d.q)}</textarea>
-    <label>${t('Options (one per line, multiple choice only)')}</label><textarea data-k="options" rows="3">${esc(d.options.join('\n'))}</textarea>
-    <label>${t('Correct answer')}${d.type === 'mc' ? t(' (must match an option exactly)') : t(' (separate accepted alternatives with |)')}</label><input type="text" data-k="answer" value="${esc(d.answer.join(' | '))}">
-    <label>${t('Explanation')}</label><input type="text" data-k="explain" value="${esc(d.explain)}">
-    <div class="err"></div><button class="btn small" data-a="approve">${t('Approve')}</button> <button class="btn small secondary" data-a="reject">${t('Reject')}</button></div>`).join('');
-  el.querySelectorAll('[data-k]').forEach(i => i.onchange = () => { const id = i.closest('[data-id]').dataset.id, k = i.dataset.k, v = i.value;
-    patch(id, { [k]: k === 'options' ? v.split('\n') : k === 'answer' ? v.split('|') : v }); });
-  el.querySelectorAll('[data-a]').forEach(b => b.onclick = async () => { const c = b.closest('[data-id]'), id = c.dataset.id;
-    document.activeElement && document.activeElement.blur(); await new Promise(r => setTimeout(r, 150));
-    try { await api(`/admin/drafts/${id}/${b.dataset.a}`, { body: {} }); c.remove(); } catch (e) { c.querySelector('.err').textContent = e.message; } });
-  $('#all').onclick = async () => { const r = await api('/admin/drafts/approve-all', { body: {} }); alert(t('Approved {n}.', { n: r.approved }) + (r.skipped ? t(' {n} skipped; fix their answers or options first.', { n: r.skipped }) : '')); importScreen(); };
+async function bookletView(batch) {
+  cur = () => bookletView(batch); setNav('import');
+  let r; try { r = await api('/admin/imports/' + encodeURIComponent(batch)); } catch { return importScreen(); }
+  if (IMP.batch !== batch) IMP = { batch, filter: 'all', note: '' };
+  const note = IMP.note; IMP.note = '';
+  const typeName = Object.fromEntries(TYPES()), marked = q => q.imp.aiAnswer || q.imp.figure || q.imp.needsFix;
+  const nMarked = r.questions.filter(marked).length, shown = IMP.filter === 'marked' ? r.questions.filter(marked) : r.questions;
+  const groups = []; shown.forEach(q => { let g = groups.find(x => x.subject === q.subject && x.topic === q.topic); if (!g) groups.push(g = { subject: q.subject, topic: q.topic, qs: [] }); g.qs.push(q); });
+  const answerLine = q => `<div class="bans"><b>${t('Answer')}:</b> ${esc((q.answer || []).join(' / ')) || '—'}</div>`;
+  const card = q => `<div class="panel bq" data-id="${esc(q.id)}">
+    <div>${q.imp.needsFix ? `<span class="tag bad">${t('Incomplete: hidden from students until fixed')}</span> ` : ''}${q.imp.aiAnswer ? `<span class="tag warn">${t('Answer written by AI: check it')}</span> ` : ''}${q.imp.figure ? `<span class="tag warn">${t('Refers to a diagram')}</span> ` : ''}${q.imp.page ? `<span class="tag">${t('Page {n}', { n: q.imp.page })}</span> ` : ''}<span class="tag">${typeName[q.type] || esc(q.type)}</span></div>
+    <div class="qtext">${esc(q.q)}</div>
+    ${q.type === 'mc' ? `<ol class="bopts" type="A">${(q.options || []).map(o => `<li class="${(q.answer || []).includes(o) ? 'right' : ''}">${esc(o)}</li>`).join('')}</ol>${(q.options || []).includes((q.answer || [])[0]) ? '' : answerLine(q)}` : answerLine(q)}
+    ${q.explain ? `<div class="muted"><b>${t('Explanation')}:</b> ${esc(q.explain)}</div>` : ''}
+    <div class="bact"><button class="btn small secondary" data-a="edit">${t('Edit')}</button>${q.imp.aiAnswer && !q.imp.needsFix ? `<button class="btn small secondary" data-a="ok">${t('Answer is correct')}</button>` : ''}<button class="btn small ghost" data-a="del">${t('Remove')}</button></div></div>`;
+  app.innerHTML = `<button class="btn small ghost" id="back">← ${t('All booklets')}</button>
+    <div class="head"><p class="eyebrow">${t('Imported booklet')}</p><h1>${esc(bookletName(r.name))}</h1><p class="muted" style="margin-top:6px">${esc(when(r.created))} · ${esc(yl(r.year))} · ${t('{n} questions', { n: r.questions.length })}</p></div>
+    ${note ? `<div class="panel"><p>${esc(note)}</p></div>` : ''}
+    <datalist id="dl-y">${r.years.map(x => `<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-s">${r.subjects.map(x => `<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-t">${r.topics.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
+    <p class="muted">${t('These questions are live for students. Read over them and fix anything that needs it.')}</p>
+    <div class="seg"><button class="btn small ${IMP.filter === 'all' ? '' : 'secondary'}" data-filter="all">${t('All questions ({n})', { n: r.questions.length })}</button><button class="btn small ${IMP.filter === 'marked' ? '' : 'secondary'}" data-filter="marked">${t('Only marked ({n})', { n: nMarked })}</button></div>
+    ${!r.questions.length ? `<p class="empty">${t('This booklet has no questions left.')}</p>` : !groups.length ? `<p class="empty">${t('Nothing marked in this booklet.')}</p>`
+      : groups.map(g => `<h2 class="bgroup">${esc(sl(g.subject))} · ${esc(g.topic)}</h2>` + g.qs.map(card).join('')).join('')}`;
+  $('#back').onclick = () => importScreen();
+  app.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { IMP.filter = b.dataset.filter; bookletView(batch); });
+  app.querySelectorAll('.bq').forEach(row => { const id = row.dataset.id, q = r.questions.find(x => x.id === id);
+    row.querySelector('[data-a=del]').onclick = async () => { if (confirm(t('Remove this question? Students will no longer see it, but past results are kept.'))) { await api('/admin/questions/' + id, { method: 'DELETE', body: {} }); bookletView(batch); } };
+    const ok = row.querySelector('[data-a=ok]'); if (ok) ok.onclick = async () => { await api(`/admin/questions/${id}/checked`, { body: {} }); bookletView(batch); };
+    row.querySelector('[data-a=edit]').onclick = () => { row.innerHTML = qForm(q); wireForm(row, async d => { await api('/admin/questions/' + id, { method: 'PATCH', body: d }); bookletView(batch); }, () => bookletView(batch)); }; });
 }
 boot();
 })();
