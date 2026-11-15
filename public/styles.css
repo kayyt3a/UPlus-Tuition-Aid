@@ -175,3 +175,15 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:10px 8px
 .bq .bans{margin-bottom:8px}
 .bq .bact{margin-top:12px}
 @media (max-width:600px){.blist .brow{flex-direction:column;align-items:flex-start}}
+
+/* booklet import: progress while Claude reads a booklet */
+.drop.busy{opacity:.45;pointer-events:none}
+.iprog{display:flex;gap:14px;align-items:flex-start;padding:16px;border:1px solid var(--line2);border-radius:var(--r);background:var(--brand-l);color:var(--ink)}
+.iprog-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;overflow-wrap:anywhere}
+.spin{flex:none;width:22px;height:22px;border-radius:50%;border:3px solid var(--line2);border-top-color:var(--brand);animation:spin .9s linear infinite;margin-top:2px}
+.ibar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.ibar i{display:block;height:100%;background:var(--brand);transition:width .3s}
+.ibar.ind i{background:linear-gradient(90deg,transparent 0,var(--brand) 40%,var(--brand) 60%,transparent 100%);background-size:50% 100%;background-repeat:no-repeat;animation:slide 1.4s ease-in-out infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes slide{0%{background-position:-60% 0}100%{background-position:160% 0}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}.ibar.ind i{animation-duration:4s}}

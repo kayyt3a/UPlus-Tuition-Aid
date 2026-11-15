@@ -342,16 +342,33 @@ async function importScreen(err, note) {
     <div class="panel blist"><h2>${t('Imported booklets')}</h2>${imports.length ? imports.map(i => `<div class="brow"><div><b>${esc(bookletName(i.name))}</b><div class="muted">${esc(when(i.created))} · ${esc(yl(i.year))} · ${t('{n} questions', { n: i.count })}</div></div>
       <div class="bact">${i.marked ? `<span class="tag warn">${t('{n} to check', { n: i.marked })}</span>` : ''}<button class="btn small secondary" data-b="${esc(i.batch)}">${t('Open')}</button></div></div>`).join('') : `<p class="empty">${t('No booklets imported yet.')}</p>`}</div>`;
   const drop = $('#drop'), st = $('#st');
+  // XHR rather than fetch so the upload itself can show a percentage.
+  const send = (f, qs, onProg) => new Promise((ok, no) => { const x = new XMLHttpRequest(); x.open('POST', '/api/admin/import?' + qs); x.setRequestHeader('content-type', f.type);
+    x.upload.onprogress = e => e.lengthComputable && onProg(e.loaded / e.total); x.upload.onload = () => onProg(1);
+    x.onload = () => { let j = {}; try { j = JSON.parse(x.responseText); } catch {} x.status >= 200 && x.status < 300 ? ok(j) : no(new Error(t(j.error || 'Something went wrong'))); };
+    x.onerror = () => no(new Error(t('Upload failed. Check the internet connection and try again.'))); x.send(f); });
+  let busy = false;
   const upload = async files => {
+    if (busy || !files.length) return;
     const year = $('#iy').value.trim(), subject = $('#is').value.trim(); LS.set('iy', year); LS.set('is', subject);
     if (!year) return (st.textContent = t('Enter a year group first.'));
+    busy = true; drop.classList.add('busy'); const warn = e => { e.preventDefault(); e.returnValue = ''; }; addEventListener('beforeunload', warn);
+    const t0 = Date.now(); let fi = 0, pct = 0;
+    // A clear, moving progress box so a long read never looks like a crash.
+    const paint = () => { const s = Math.floor((Date.now() - t0) / 1000), f = files[fi], up = pct < 1;
+      st.innerHTML = `<div class="iprog" role="status" aria-live="polite"><span class="spin" aria-hidden="true"></span><div class="iprog-b">
+        ${files.length > 1 ? `<div class="muted">${t('File {i} of {n}', { i: fi + 1, n: files.length })}</div>` : ''}
+        <b>${up ? esc(t('Uploading {f}… {p}%', { f: f.name, p: Math.round(pct * 100) })) : esc(t('Claude is reading {f} and picking out the questions…', { f: f.name }))}</b>
+        <div class="ibar ${up ? '' : 'ind'}"><i style="width:${up ? Math.round(pct * 100) : 100}%"></i></div>
+        <div class="muted">${esc(t('Time so far: {t}', { t: Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') }))} · ${t('This usually takes 1–3 minutes. Please keep this page open.')}</div></div></div>`; };
+    const tick = setInterval(paint, 1000), done = () => { clearInterval(tick); busy = false; removeEventListener('beforeunload', warn); };
     let last = null, added = 0, fix = 0;
-    for (const f of files) {
-      st.textContent = t('Reading {f}… this can take a minute or two.', { f: f.name });
-      try { const r = await fetch('/api/admin/import?' + new URLSearchParams({ year, subject, name: f.name }), { method: 'POST', headers: { 'content-type': f.type }, body: f });
-        const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(t(j.error || 'Something went wrong')); last = j.batch; added += j.added; fix += j.needsFix; }
-      catch (e) { return importScreen(`${f.name}: ${e.message}`); }
+    for (fi = 0; fi < files.length; fi++) {
+      const f = files[fi]; pct = 0; paint();
+      try { const j = await send(f, new URLSearchParams({ year, subject, name: f.name }), p => { pct = p; paint(); }); last = j.batch; added += j.added; fix += j.needsFix; }
+      catch (e) { done(); return importScreen(`${f.name}: ${e.message}`); }
     }
+    done();
     const msg = t('{n} questions added. They are live for students now.', { n: added }) + (fix ? ' ' + t('{n} are incomplete and hidden from students until you fix them.', { n: fix }) : '');
     if (files.length === 1 && last) { IMP = { batch: last, filter: 'all', note: msg }; return bookletView(last); }
     importScreen(null, msg);
