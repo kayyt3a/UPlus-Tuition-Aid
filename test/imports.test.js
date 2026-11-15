@@ -104,3 +104,22 @@ test('migrateDrafts keeps page numbers numeric and never overwrites an existing 
   assert.equal(JSON.parse(get('imp-1').data).imp.page, null);
   assert.equal(JSON.parse(get('imp-2').data).q, 'Edited by admin'); assert.equal(get('imp-2').archived, 1);
 });
+
+test('setYear moves every live question in a booklet to another year group', () => {
+  const db = fresh();
+  const { batch } = imports.saveImport(db, { name: 'B', year: 'Year 3', subject: 'Maths', items: [item(), item({ q: 'Second' })] });
+  const other = imports.saveImport(db, { name: 'C', year: 'Year 3', subject: 'Maths', items: [item({ q: 'Other' })] });
+  assert.equal(imports.setYear(db, batch, 'Year 6'), 2);
+  const r = imports.getImport(db, batch); assert.equal(r.year, 'Year 6'); assert.deepEqual(r.questions.map(q => q.year), ['Year 6', 'Year 6']);
+  assert.equal(imports.getImport(db, other.batch).questions[0].year, 'Year 5'); // other booklets untouched
+  assert.equal(imports.setYear(db, 'nope', 'Year 6'), null);
+});
+
+test('removeImport hides the booklet and its questions but keeps the rows for past results', () => {
+  const db = fresh();
+  const { batch } = imports.saveImport(db, { name: 'B', year: 'Year 3', subject: 'Maths', items: [item(), item({ q: 'Second' })] });
+  assert.equal(imports.removeImport(db, batch), 2);
+  assert.equal(imports.getImport(db, batch), null); assert.equal(imports.listImports(db).length, 0);
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM questions WHERE archived=1').get().n, 2);
+  assert.equal(imports.removeImport(db, batch), null);
+});

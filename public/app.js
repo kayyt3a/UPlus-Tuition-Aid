@@ -1,5 +1,6 @@
 (() => {
 const $ = s => document.querySelector(s), app = $('#app'), nav = $('#nav');
+const mx = s => window.fmtMaths(s); // escaped HTML with 5/8 shown as a stacked fraction (public/maths.js)
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 let CFG = {}, ME = null, child = null, S = null, subj = null;
 const DAILY_GOAL = 10;
@@ -147,7 +148,7 @@ function question() {
   const written = q.type === 'written', key = written ? 'im_w' : 'im_s';
   const modes = written ? [['photo', t('Photo of paper')], ['pad', t('Write on screen')], ['type', t('Type')]] : [['type', t('Type')], ['pad', t('Write on screen')]];
   let im = LS.get(key); if (!modes.some(m => m[0] === im)) im = written ? (innerWidth < 700 ? 'photo' : 'pad') : 'type'; S.input = im;
-  const body = q.type === 'mc' ? q.options.map((o, i) => `<button class="opt" data-o="${esc(o)}"><span class="k">${'ABCDEFGH'[i]}</span>${esc(o)}</button>`).join('')
+  const body = q.type === 'mc' ? q.options.map((o, i) => `<button class="opt" data-o="${esc(o)}"><span class="k">${'ABCDEFGH'[i]}</span>${mx(o)}</button>`).join('')
     : `<div class="sc full" id="modes">${modes.map(([k, l]) => `<button type="button" data-im="${k}">${l}</button>`).join('')}</div>
       <div style="margin-top:14px">
       ${written ? `<div id="pane-photo" hidden><p class="hint">${t('Do your working on paper, then add a photo of it.')}</p>
@@ -160,7 +161,7 @@ function question() {
     <div class="pbar"><i style="width:${S.i / S.qs.length * 100}%"></i></div>
     ${S.mode === 'mock' ? `<span class="timer" id="timer">${fmt(Math.ceil((S.deadline - Date.now()) / 1000))}</span>` : `<span class="cnt">${S.i + 1} / ${S.qs.length}</span>`}</div>
     <div class="qcard ${S.mode === 'blitz' ? 'blitz' : ''}"><div class="qmeta">${esc(sl(q.subject))} · ${esc(q.topic)}${S.mode === 'mock' ? ` · ${t('{i} of {n}', { i: S.i + 1, n: S.qs.length })}` : ''}</div>
-    <div class="q-text">${esc(q.q)}</div>${body}<div id="fb"></div></div>`;
+    <div class="q-text">${mx(q.q)}</div>${body}<div id="fb"></div></div>`;
   $('#quit').onclick = () => { if (confirm(t('Leave this practice? Your answers so far are saved.'))) { clearInterval(S.tick); S = null; home(); } };
   if (q.type === 'mc') { app.querySelectorAll('.opt').forEach(b => b.onclick = () => submit(q, b.dataset.o, b)); return; }
   const setMode = m => { S.input = m; LS.set(key, m);
@@ -219,14 +220,14 @@ async function submit(q, given, btn, selfCorrect) {
   catch (e) { S.busy = false; if (e.status === 402) return locked(); $('#fb').innerHTML = `<div class="fb bad"><strong>${esc(e.message)}</strong></div>`; const sb = $('#sub'); if (sb) sb.disabled = false; return; }
   if (r.unreadable) { S.busy = false; const sb = $('#sub'); if (sb) sb.disabled = false; $('#fb').innerHTML = `<div class="fb bad"><strong>${t("We couldn't read that photo")}</strong><div class="ex">${esc(t(r.feedback))}</div></div>`; return; }
   if (r.needsSelfMark) { S.busy = false; $('#ans').disabled = true; $('#sub').remove(); lockInputs();
-    $('#fb').innerHTML = `<div class="fb"><strong>${t('Model answer')}</strong><div class="ex">${esc(r.answer)}<br>${esc(r.explain || '')}</div><p class="muted" style="margin:10px 0 8px">${t('Compare this with your answer. Did you get it right?')}</p>
+    $('#fb').innerHTML = `<div class="fb"><strong>${t('Model answer')}</strong><div class="ex">${mx(r.answer)}<br>${mx(r.explain || '')}</div><p class="muted" style="margin:10px 0 8px">${t('Compare this with your answer. Did you get it right?')}</p>
       <div class="row"><button class="btn" id="yes">${t('I got it right')}</button><button class="btn secondary" id="no">${t('Not quite')}</button></div></div>`;
     $('#yes').onclick = () => submit(q, given, null, true); $('#no').onclick = () => submit(q, given, null, false); return; }
   S.answered++; S.results[S.i] = r.correct; if (r.correct) S.right++;
   if (q.type === 'mc') app.querySelectorAll('.opt').forEach(b => { b.disabled = true; if (b.dataset.o === r.answer) b.classList.add('right'); else if (b === btn) b.classList.add('wrong'); });
   else { const a = $('#ans'); if (a) a.disabled = true; const sb = $('#sub'); if (sb) sb.remove(); lockInputs(); }
   const last = S.i + 1 >= S.qs.length, quick = S.mode === 'blitz' && r.correct;
-  $('#fb').innerHTML = `<div class="fb ${r.correct ? 'good' : 'bad'}"><strong>${r.correct ? t('Correct') : t('Not quite')}</strong>${r.correct ? '' : `<div class="ex">${t('Answer: ')}<b>${esc(r.answer)}</b></div>`}${r.explain ? `<div class="ex">${esc(r.explain)}</div>` : ''}</div>
+  $('#fb').innerHTML = `<div class="fb ${r.correct ? 'good' : 'bad'}"><strong>${r.correct ? t('Correct') : t('Not quite')}</strong>${r.correct ? '' : `<div class="ex">${t('Answer: ')}<b>${mx(r.answer)}</b></div>`}${r.explain ? `<div class="ex">${mx(r.explain)}</div>` : ''}</div>
     <div class="next-row"><button id="next" class="btn block">${last ? t('Finish') : t('Next question')}</button></div>`;
   const next = () => { if (!S || S.qs[S.i] !== q) return; S.i++; S.i < S.qs.length ? question() : finish(); };
   $('#next').onclick = next; if (quick) setTimeout(next, 700); $('#next').focus();
@@ -314,7 +315,7 @@ async function qbank() {
   <div id="newq" class="panel" hidden></div>
   ${r.samples ? `<div class="panel"><h2>${t('Sample questions')}</h2><p class="muted">${t('The app came with {n} placeholder questions.', { n: r.samples })}</p><button class="btn small secondary" id="rmsamples">${t('Remove all sample questions')}</button></div>` : ''}
   <p class="muted">${r.total === 1 && LANG !== 'zh' ? '1 question' : t('{n} questions', { n: r.total })}${r.total > r.questions.length ? ' · ' + t('Showing the first {n}. Use the filters to narrow down.', { n: r.questions.length }) : ''}</p>
-  ${r.questions.length ? r.questions.map(q => `<div class="panel qrow" data-id="${esc(q.id)}"><div class="qmain"><b>${esc(q.q.length > 150 ? q.q.slice(0, 150) + '…' : q.q)}</b>
+  ${r.questions.length ? r.questions.map(q => `<div class="panel qrow" data-id="${esc(q.id)}"><div class="qmain"><b>${mx(q.q.length > 150 ? q.q.slice(0, 150) + '…' : q.q)}</b>
     <div class="muted">${esc(yl(q.year))} · ${esc(sl(q.subject))} · ${esc(q.topic)} · ${typeName[q.type] || q.type}</div></div>
     <div class="qact"><button class="btn small secondary" data-a="edit">${t('Edit')}</button> <button class="btn small secondary" data-a="del">${t('Delete')}</button></div></div>`).join('') : `<p class="empty">${t('No questions match.')}</p>`}`;
   const refresh = () => { QB = { q: $('#fq').value.trim(), year: $('#fy').value, subject: $('#fs').value }; qbank(); };
@@ -386,15 +387,17 @@ async function bookletView(batch) {
   const typeName = Object.fromEntries(TYPES()), marked = q => q.imp.aiAnswer || q.imp.figure || q.imp.needsFix;
   const nMarked = r.questions.filter(marked).length, shown = IMP.filter === 'marked' ? r.questions.filter(marked) : r.questions;
   const groups = []; shown.forEach(q => { let g = groups.find(x => x.subject === q.subject && x.topic === q.topic); if (!g) groups.push(g = { subject: q.subject, topic: q.topic, qs: [] }); g.qs.push(q); });
-  const answerLine = q => `<div class="bans"><b>${t('Answer')}:</b> ${esc((q.answer || []).join(' / ')) || '—'}</div>`;
+  const answerLine = q => `<div class="bans"><b>${t('Answer')}:</b> ${mx((q.answer || []).join(' / ')) || '—'}</div>`;
   const card = q => `<div class="panel bq" data-id="${esc(q.id)}">
     <div>${q.imp.needsFix ? `<span class="tag bad">${t('Incomplete: hidden from students until fixed')}</span> ` : ''}${q.imp.aiAnswer ? `<span class="tag warn">${t('Answer written by AI: check it')}</span> ` : ''}${q.imp.figure ? `<span class="tag warn">${t('Refers to a diagram')}</span> ` : ''}${q.imp.page ? `<span class="tag">${esc(t('Page {n}', { n: q.imp.page }))}</span> ` : ''}<span class="tag">${typeName[q.type] || esc(q.type)}</span></div>
-    <div class="qtext">${esc(q.q)}</div>
-    ${q.type === 'mc' ? `<ol class="bopts" type="A">${(q.options || []).map(o => `<li class="${(q.answer || []).includes(o) ? 'right' : ''}">${esc(o)}</li>`).join('')}</ol>${(q.options || []).includes((q.answer || [])[0]) ? '' : answerLine(q)}` : answerLine(q)}
-    ${q.explain ? `<div class="muted"><b>${t('Explanation')}:</b> ${esc(q.explain)}</div>` : ''}
+    <div class="qtext">${mx(q.q)}</div>
+    ${q.type === 'mc' ? `<ol class="bopts" type="A">${(q.options || []).map(o => `<li class="${(q.answer || []).includes(o) ? 'right' : ''}">${mx(o)}</li>`).join('')}</ol>${(q.options || []).includes((q.answer || [])[0]) ? '' : answerLine(q)}` : answerLine(q)}
+    ${q.explain ? `<div class="muted"><b>${t('Explanation')}:</b> ${mx(q.explain)}</div>` : ''}
     <div class="bact"><button class="btn small secondary" data-a="edit">${t('Edit')}</button>${q.imp.aiAnswer && !q.imp.needsFix ? `<button class="btn small secondary" data-a="ok">${t('Answer is correct')}</button>` : ''}<button class="btn small ghost" data-a="del">${t('Remove')}</button></div></div>`;
   app.innerHTML = `<button class="btn small ghost" id="back">← ${t('All booklets')}</button>
     <div class="head"><p class="eyebrow">${t('Imported booklet')}</p><h1>${esc(bookletName(r.name))}</h1><p class="muted" style="margin-top:6px">${esc(when(r.created))} · ${esc(yl(r.year))} · ${t('{n} questions', { n: r.questions.length })}</p></div>
+    <div class="panel bmanage"><label style="margin-top:0">${t('Year group for this whole booklet')}</label><div class="bact"><input type="text" id="by" list="dl-y" value="${esc(r.year)}" style="max-width:180px">
+      <button class="btn small secondary" id="bmove">${t('Move all questions to this year group')}</button><span style="flex:1"></span><button class="btn small ghost" id="bdel">${t('Remove whole booklet')}</button></div></div>
     ${note ? `<div class="panel"><p>${esc(note)}</p></div>` : ''}
     <datalist id="dl-y">${r.years.map(x => `<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-s">${r.subjects.map(x => `<option value="${esc(x)}">`).join('')}</datalist><datalist id="dl-t">${r.topics.map(x => `<option value="${esc(x)}">`).join('')}</datalist>
     <p class="muted">${t('These questions are live for students. Read over them and fix anything that needs it.')}</p>
@@ -402,6 +405,11 @@ async function bookletView(batch) {
     ${!r.questions.length ? `<p class="empty">${t('This booklet has no questions left.')}</p>` : !groups.length ? `<p class="empty">${t('Nothing marked in this booklet.')}</p>`
       : groups.map(g => `<h2 class="bgroup">${esc(sl(g.subject))} · ${esc(g.topic)}</h2>` + g.qs.map(card).join('')).join('')}`;
   $('#back').onclick = () => importScreen();
+  $('#bmove').onclick = async () => { const year = $('#by').value.trim(); if (!year || year === r.year) return;
+    if (!confirm(t('Move all {n} questions in this booklet to {y}?', { n: r.questions.length, y: yl(year) }))) return;
+    try { const x = await api('/admin/imports/' + encodeURIComponent(batch), { method: 'PATCH', body: { year } }); IMP.note = t('{n} questions moved to {y}.', { n: x.moved, y: yl(year) }); bookletView(batch); } catch (e) { alert(e.message); } };
+  $('#bdel').onclick = async () => { if (!confirm(t('Remove this whole booklet? Students will no longer see any of its {n} questions, but past results are kept.', { n: r.questions.length }))) return;
+    try { await api('/admin/imports/' + encodeURIComponent(batch), { method: 'DELETE', body: {} }); importScreen(); } catch (e) { alert(e.message); } };
   app.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { IMP.filter = b.dataset.filter; bookletView(batch); });
   app.querySelectorAll('.bq').forEach(row => { const id = row.dataset.id, q = r.questions.find(x => x.id === id);
     row.querySelector('[data-a=del]').onclick = async () => { if (confirm(t('Remove this question? Students will no longer see it, but past results are kept.'))) { try { await api('/admin/questions/' + id, { method: 'DELETE', body: {} }); bookletView(batch); } catch (e) { alert(e.message); } } };

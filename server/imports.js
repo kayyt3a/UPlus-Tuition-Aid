@@ -54,4 +54,17 @@ function migrateDrafts(db) {
   return ds.length;
 }
 
-module.exports = { ensureSchema, isComplete, saveImport, listImports, getImport, mergeEdit, markChecked, migrateDrafts };
+// Whole-booklet actions. Both return the number of questions changed, or null for an unknown booklet.
+const inBatch = "WHERE archived=0 AND json_extract(data,'$.imp.batch')=?";
+function setYear(db, batch, year) {
+  if (!db.prepare('SELECT 1 FROM imports WHERE batch=?').get(batch)) return null;
+  return tx(db, () => { db.prepare('UPDATE imports SET year=? WHERE batch=?').run(year, batch);
+    const rows = db.prepare('SELECT id, data FROM questions ' + inBatch).all(batch), up = db.prepare('UPDATE questions SET data=? WHERE id=?');
+    rows.forEach(r => up.run(JSON.stringify({ ...JSON.parse(r.data), year }), r.id)); return rows.length; });
+}
+function removeImport(db, batch) { // questions are archived, not deleted, so old results still map to a topic
+  if (!db.prepare('SELECT 1 FROM imports WHERE batch=?').get(batch)) return null;
+  return tx(db, () => { const n = db.prepare('UPDATE questions SET archived=1 ' + inBatch).run(batch).changes; db.prepare('DELETE FROM imports WHERE batch=?').run(batch); return n; });
+}
+
+module.exports = { ensureSchema, isComplete, saveImport, listImports, getImport, mergeEdit, markChecked, migrateDrafts, setYear, removeImport };

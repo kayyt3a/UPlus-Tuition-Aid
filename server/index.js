@@ -133,6 +133,9 @@ async function api(req, res, url) {
     }
     if (p === '/api/admin/imports' && m === 'GET') return json(res, 200, { imports: imports.listImports(db), years: DATA.yearGroups });
     const im = /^\/api\/admin\/imports\/([\w-]+)$/.exec(p);
+    if (im && m === 'PATCH') { const year = String(b.year || '').trim().slice(0, 30); if (!year) return json(res, 400, { error: 'Choose a year group first.' });
+      const n = imports.setYear(db, im[1], year); if (n === null) return json(res, 404, { error: 'Not found' }); loadQuestions(); return json(res, 200, { moved: n }); }
+    if (im && m === 'DELETE') { const n = imports.removeImport(db, im[1]); if (n === null) return json(res, 404, { error: 'Not found' }); loadQuestions(); return json(res, 200, { removed: n }); }
     if (im && m === 'GET') { const r = imports.getImport(db, im[1]); if (!r) return json(res, 404, { error: 'Not found' });
       return json(res, 200, { ...r, years: DATA.yearGroups, subjects: uniq('subject'), topics: uniq('topic') }); }
     const ck = /^\/api\/admin\/questions\/([\w-]+)\/checked$/.exec(p);

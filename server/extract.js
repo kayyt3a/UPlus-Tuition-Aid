@@ -15,6 +15,7 @@ Rules:
 - If the booklet gives the answer, use it and set answer_from_booklet true. If not, work out the answer yourself and set answer_from_booklet false.
 - If a question depends on a diagram, graph, table or picture you cannot fully express in text, describe it in the question text as best you can and set has_figure true.
 - Reading passages: copy the passage into each question that needs it, or write "Passage: ..." at the start of q.
+- Write fractions as numerator/denominator with no spaces (for example 5/8), mixed numbers as whole number, space, fraction (for example 2 3/4), and never use fraction characters such as ½.
 - Do not invent questions.`;
 
 function parseResponse(text, { year, subject }) {

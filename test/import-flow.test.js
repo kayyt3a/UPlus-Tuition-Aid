@@ -86,3 +86,21 @@ test('old approval endpoints are gone and parents cannot use booklet endpoints',
   assert.equal((await call(parent, '/api/admin/imports')).status, 403);
   assert.equal((await call(admin, '/api/admin/imports/nope')).status, 404);
 });
+
+test('the admin can move a whole booklet to another year group, then remove it', async () => {
+  const admin = await login('admin@uplus.test', 'admin123'), parent = await login('parent@uplus.test', 'parent123');
+  replies.push(ITEMS.map(x => ({ ...x, q: x.q.replace('(import test)', '(move test)') })));
+  const { batch } = (await upload(admin, 'Wrong year.pdf')).json;
+  const childId = (await call(parent, '/api/me')).json.children[0].id;
+  const sees = async y => (await call(parent, `/api/questions?childId=${childId}&year=${encodeURIComponent(y)}&subject=Maths&n=40`)).json.questions.filter(q => q.q.includes('(move test)')).length;
+  assert.equal(await sees('Year 5'), 2); // one of the three is incomplete and hidden
+  const mv = await call(admin, '/api/admin/imports/' + batch, { method: 'PATCH', body: { year: 'Year 6' } });
+  assert.equal(mv.status, 200); assert.equal(mv.json.moved, 3);
+  assert.equal(await sees('Year 5'), 0); assert.equal(await sees('Year 6'), 2);
+  assert.equal((await call(admin, '/api/admin/imports/' + batch)).json.year, 'Year 6');
+  const rm = await call(admin, '/api/admin/imports/' + batch, { method: 'DELETE', body: {} });
+  assert.equal(rm.status, 200); assert.equal(rm.json.removed, 3);
+  assert.equal(await sees('Year 6'), 0);
+  assert.equal((await call(admin, '/api/admin/imports/' + batch)).status, 404);
+  assert.equal((await call(parent, '/api/admin/imports/' + batch, { method: 'PATCH', body: { year: 'Year 3' } })).status, 403);
+});

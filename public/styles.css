@@ -187,3 +187,11 @@ table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{padding:10px 8px
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes slide{0%{background-position:-60% 0}100%{background-position:160% 0}}
 @media (prefers-reduced-motion:reduce){.spin{animation-duration:3s}.ibar.ind i{animation-duration:4s}}
+
+/* stacked fractions (public/maths.js) */
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;font-size:.82em;line-height:1.15;margin:0 .12em;text-align:center}
+.frac .num{border-bottom:.09em solid currentColor;padding:0 .2em .05em}
+.frac .den{padding:.05em .2em 0}
+.frac .sl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mixed{white-space:nowrap}.mixed .frac{margin-left:.08em}
+.bmanage .bact input{margin:0}
