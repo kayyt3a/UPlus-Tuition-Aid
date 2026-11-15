@@ -170,7 +170,7 @@ function question() {
     if (m === 'type') $('#ans').focus(); };
   app.querySelectorAll('#modes button').forEach(b => b.onclick = () => setMode(b.dataset.im)); setMode(im);
   $('#sub').onclick = () => submit(q, $('#ans').value);
-  if (!written) $('#ans').onkeydown = e => e.key === 'Enter' && submit(q, $('#ans').value);
+  if (!written) $('#ans').onkeydown = e => { if (e.key === 'Enter') submit(q, $('#ans').value); }; // braces matter: an on* handler that returns false cancels the key, so nothing could be typed
   const ph = $('#photo'); if (ph) ph.onchange = async () => { const f = ph.files[0]; if (!f) return;
     try { S.image = await shrink(f); $('#prev').innerHTML = `<div class="prev"><img src="${S.image}" alt="${t('Your working')}"><button class="x2" id="rm" type="button" aria-label="${t('Remove photo')}">${ico('x')}</button></div>`; $('#rm').onclick = () => { S.image = null; ph.value = ''; $('#prev').innerHTML = ''; }; }
     catch { $('#prev').innerHTML = `<div class="err">${t('That photo could not be opened. Try a JPEG or PNG, or type your answer.')}</div>`; } };
