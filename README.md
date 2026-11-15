@@ -9,6 +9,7 @@ Colours follow the UPlus website: orange `#F1AF59`, indigo `#3949AB`, dark ink `
 
 ## Run
     npm start            # http://localhost:3000
+    npm test             # automated tests (no API key needed)
 
 First start seeds demo data:
 - Parent: `parent@uplus.test` / `parent123` (child Mia, 10 days of history)
@@ -54,7 +55,9 @@ Real students pause to think, so 150 non-stop students is far heavier than 150 r
 - Without `ANTHROPIC_API_KEY` the child self-marks against the model answer instead.
 
 ## Importing booklets (drag & drop)
-Log in as admin → **Import booklet**. Pick the year group, drop a PDF (or page photos, max 30 MB each; split long booklets). Claude extracts every question into a review queue, flagging answers it had to work out itself and questions that depend on a diagram. Edit anything, then approve; approved questions go live immediately. Needs `ANTHROPIC_API_KEY` (optional `EXTRACT_MODEL`). Always check flagged answers before approving.
+Log in as admin → **Import**. Pick the year group, drop a PDF (or page photos, max 30 MB each; split long booklets). Claude keeps only the questions students should answer: teaching content, worked examples, answer keys and duplicates are skipped, and the booklet's wording is kept. **Questions go live for students straight away.** You then land on the booklet's page: questions grouped by subject and topic, shown as students see them, with **Edit**, **Remove** and **Answer is correct**. Markers show what to check first: answers Claude worked out itself, questions that refer to a diagram, and incomplete questions (hidden from students until you fix them). "Only marked" shows just those. Earlier booklets stay listed on the Import page. Needs `ANTHROPIC_API_KEY` (optional `EXTRACT_MODEL`).
+
+To try the import screen without a key: run `node test/fake-claude.js`, then start the app with `ANTHROPIC_API_KEY=test ANTHROPIC_BASE_URL=http://127.0.0.1:4999 npm start`. Every upload then returns four sample questions.
 
 ## Managing questions (admin → Questions)
 All questions live in the database and are managed in the app: add one at a time with the form, edit, delete (students stop seeing it; past results are kept), search and filter. New year groups, subjects and topics are created just by typing them. The 20 sample questions that ship with the app can be removed with one button. To add many at once, use **Import** (below).

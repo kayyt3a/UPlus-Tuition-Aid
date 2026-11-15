@@ -5,17 +5,20 @@ const db = require('./db'), auth = require('./auth'), mark = require('./mark'), 
 const BASE = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'data', 'questions.json'), 'utf8'));
 try { db.exec('ALTER TABLE questions ADD COLUMN archived INTEGER NOT NULL DEFAULT 0'); } catch {}
 db.exec('CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT)');
+const imports = require('./imports');
+imports.ensureSchema(db); imports.migrateDrafts(db); // questions still waiting in the old approval queue go live once, as an "Earlier import"
 if (!db.prepare("SELECT v FROM meta WHERE k='seeded'").get()) { // one-off: load the sample questions so the app is not empty on first run
   const ins = db.prepare('INSERT OR IGNORE INTO questions(id,data) VALUES(?,?)'); BASE.questions.forEach(q => ins.run(q.id, JSON.stringify(q)));
   db.prepare("INSERT INTO meta VALUES('seeded','1')").run(); }
 let DATA, QMAP;
 function loadQuestions() {
   const rows = db.prepare('SELECT data, archived FROM questions').all().map(r => ({ q: JSON.parse(r.data), arch: r.archived }));
-  const active = rows.filter(r => !r.arch).map(r => r.q);
+  const active = rows.filter(r => !r.arch && !(r.q.imp && r.q.imp.needsFix)).map(r => r.q); // incomplete imports stay hidden until the admin fixes them
   DATA = { yearGroups: [...new Set([...BASE.yearGroups, ...active.map(q => q.year)])].sort(), questions: active };
   QMAP = Object.fromEntries(rows.map(r => [r.q.id, r.q])); // includes removed questions so old results still map to a topic
 }
 loadQuestions();
+const uniq = k => [...new Set(DATA.questions.map(q => q[k]))].sort();
 const crypto = require('crypto');
 const extract = require('./extract');
 const rawBody = (req, max) => new Promise((ok, no) => { const ch = []; let n = 0; req.on('data', c => { n += c.length; if (n > max) { no(new Error('File too large')); req.destroy(); } else ch.push(c); }); req.on('end', () => ok(Buffer.concat(ch))); req.on('error', no); });
@@ -32,7 +35,7 @@ const cookieFlags = (maxAge) => `HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAg
 const TOO_MANY = 'Too many attempts. Please wait a few minutes and try again.';
 const PUB = path.join(__dirname, '..', 'public');
 const today = () => new Date().toISOString().slice(0, 10);
-const strip = ({ answer, explain, ...q }) => q;
+const strip = ({ answer, explain, imp, ...q }) => q;
 
 function seed() {
   if (db.prepare('SELECT COUNT(*) c FROM users').get().c) return;
@@ -120,45 +123,31 @@ async function api(req, res, url) {
       db.prepare('UPDATE users SET paid_until=? WHERE id=?').run(until, u.id); return json(res, 200, { paidUntil: until });
     }
     if (p === '/api/admin/import' && m === 'POST') {
-      const mime = (req.headers['content-type'] || '').split(';')[0], year = url.searchParams.get('year') || '', subject = url.searchParams.get('subject') || '';
+      const mime = (req.headers['content-type'] || '').split(';')[0], g = k => (url.searchParams.get(k) || '').trim(), year = g('year'), subject = g('subject');
       if (!/^(application\/pdf|image\/(png|jpeg|webp|gif))$/.test(mime)) return json(res, 400, { error: 'Upload a PDF or a PNG/JPEG image.' });
       if (!year) return json(res, 400, { error: 'Choose a year group first.' });
       let buf; try { buf = await rawBody(req, 30 * 1024 * 1024); } catch (e) { return json(res, 413, { error: 'File too large (max 30 MB). Split the booklet into smaller parts.' }); }
-      try {
-        const items = await extract.extract({ buffer: buf, mime, year, subject }), batch = 'b' + Date.now(), ins = db.prepare('INSERT INTO drafts(batch,data,created) VALUES(?,?,?)');
-        items.forEach((x, i) => ins.run(batch, JSON.stringify(x), Date.now() + i)); return json(res, 200, { added: items.length });
-      } catch (e) { return json(res, 502, { error: e.message }); }
+      let items; try { items = await extract.extract({ buffer: buf, mime, year, subject }); } catch (e) { return json(res, 502, { error: e.message }); }
+      if (!items.length) return json(res, 400, { error: 'No questions were found in this file.' });
+      const r = imports.saveImport(db, { name: g('name') || 'Booklet', year, subject, items }); loadQuestions(); return json(res, 200, r);
     }
-    if (p === '/api/admin/drafts' && m === 'GET') return json(res, 200, { drafts: db.prepare("SELECT id,data FROM drafts WHERE status='pending' ORDER BY created").all().map(d => ({ id: d.id, ...JSON.parse(d.data) })), years: DATA.yearGroups });
-    const approve = d => { const x = JSON.parse(d.data); const q = { id: 'imp-' + d.id, year: x.year, subject: x.subject, topic: x.topic, type: x.type, q: x.q, answer: x.answer, explain: x.explain };
-      if (x.type === 'mc') q.options = x.options; db.prepare('INSERT OR REPLACE INTO questions(id,data,archived) VALUES(?,?,0)').run(q.id, JSON.stringify(q)); db.prepare("UPDATE drafts SET status='approved' WHERE id=?").run(d.id); };
-    const valid = x => x.q && x.answer.length && x.answer[0] && (x.type !== 'mc' || (x.options.length >= 2 && x.options.includes(x.answer[0])));
-    if (p === '/api/admin/drafts/approve-all' && m === 'POST') {
-      let n = 0, skipped = 0; for (const d of db.prepare("SELECT * FROM drafts WHERE status='pending'").all()) { valid(JSON.parse(d.data)) ? (approve(d), n++) : skipped++; }
-      loadQuestions(); return json(res, 200, { approved: n, skipped });
-    }
-    const dm = /^\/api\/admin\/drafts\/(\d+)(?:\/(approve|reject))?$/.exec(p);
-    if (dm) {
-      const d = db.prepare("SELECT * FROM drafts WHERE id=? AND status='pending'").get(+dm[1]); if (!d) return json(res, 404, { error: 'Not found' });
-      const x = JSON.parse(d.data);
-      if (m === 'PATCH') { const bb = b; for (const k of ['year', 'subject', 'topic', 'type', 'q', 'explain']) if (typeof bb[k] === 'string') x[k] = bb[k].slice(0, 4000);
-        if (Array.isArray(bb.options)) x.options = bb.options.map(o => String(o).trim()).filter(Boolean).slice(0, 8); if (Array.isArray(bb.answer)) x.answer = bb.answer.map(a => String(a).trim()).filter(Boolean);
-        db.prepare('UPDATE drafts SET data=? WHERE id=?').run(JSON.stringify(x), d.id); return json(res, 200, { ok: 1 }); }
-      if (dm[2] === 'reject') { db.prepare("UPDATE drafts SET status='rejected' WHERE id=?").run(d.id); return json(res, 200, { ok: 1 }); }
-      if (dm[2] === 'approve') { if (!valid(x)) return json(res, 400, { error: x.type === 'mc' ? 'Multiple choice needs 2+ options and the answer must match one option exactly.' : 'Add a question and an answer first.' });
-        approve(d); loadQuestions(); return json(res, 200, { ok: 1 }); }
-    }
+    if (p === '/api/admin/imports' && m === 'GET') return json(res, 200, { imports: imports.listImports(db), years: DATA.yearGroups });
+    const im = /^\/api\/admin\/imports\/([\w-]+)$/.exec(p);
+    if (im && m === 'GET') { const r = imports.getImport(db, im[1]); if (!r) return json(res, 404, { error: 'Not found' });
+      return json(res, 200, { ...r, years: DATA.yearGroups, subjects: uniq('subject'), topics: uniq('topic') }); }
+    const ck = /^\/api\/admin\/questions\/([\w-]+)\/checked$/.exec(p);
+    if (ck && m === 'POST') { if (!imports.markChecked(db, ck[1])) return json(res, 404, { error: 'Not found' }); loadQuestions(); return json(res, 200, { ok: 1 }); }
+    const valid = imports.isComplete;
     const normQ = x => ({ year: String(x.year || '').trim().slice(0, 30), subject: String(x.subject || '').trim().slice(0, 40), topic: String(x.topic || '').trim().slice(0, 60),
       type: ['mc', 'short', 'written'].includes(x.type) ? x.type : 'short', q: String(x.q || '').trim().slice(0, 4000),
       options: (Array.isArray(x.options) ? x.options : []).map(o => String(o).trim()).filter(Boolean).slice(0, 8),
       answer: (Array.isArray(x.answer) ? x.answer : []).map(a => String(a).trim()).filter(Boolean), explain: String(x.explain || '').trim().slice(0, 1000) });
     const qErr = x => !(x.year && x.subject && x.topic) ? 'Year group, subject and topic are required.' : !valid(x) ? (x.type === 'mc' ? 'Multiple choice needs 2+ options and the answer must match one option exactly.' : 'Add a question and an answer first.') : null;
-    const store = (id, x) => { if (x.type !== 'mc') delete x.options; db.prepare('INSERT OR REPLACE INTO questions(id,data,archived) VALUES(?,?,0)').run(id, JSON.stringify({ id, ...x })); loadQuestions(); };
+    const store = (id, x) => { if (x.type !== 'mc') delete x.options; db.prepare('INSERT OR REPLACE INTO questions(id,data,archived) VALUES(?,?,0)').run(id, JSON.stringify(imports.mergeEdit(QMAP[id], { id, ...x }))); loadQuestions(); };
     if (p === '/api/admin/questions' && m === 'GET') {
       const f = k => (url.searchParams.get(k) || '').trim(), term = f('q').toLowerCase();
       let list = DATA.questions.filter(q => (!f('year') || q.year === f('year')) && (!f('subject') || q.subject === f('subject')) && (!term || (q.q + ' ' + q.topic).toLowerCase().includes(term)));
       list.sort((a, b) => (a.year + a.subject + a.topic).localeCompare(b.year + b.subject + b.topic));
-      const uniq = k => [...new Set(DATA.questions.map(q => q[k]))].sort();
       return json(res, 200, { total: list.length, questions: list.slice(0, 100), years: DATA.yearGroups, subjects: uniq('subject'), topics: uniq('topic'), samples: DATA.questions.filter(q => BASE.questions.some(x => x.id === q.id)).length });
     }
     if (p === '/api/admin/questions' && m === 'POST') { const x = normQ(b), e = qErr(x); if (e) return json(res, 400, { error: e }); const id = 'man-' + crypto.randomBytes(5).toString('hex'); store(id, x); return json(res, 200, { id }); }
