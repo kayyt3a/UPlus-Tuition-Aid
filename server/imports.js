@@ -7,7 +7,7 @@ const tx = (db, fn) => { db.exec('BEGIN'); try { const r = fn(); db.exec('COMMIT
 function toQuestion(x, batch, order, id = 'imp-' + crypto.randomBytes(5).toString('hex')) {
   const q = { id, year: x.year, subject: x.subject, topic: x.topic, type: x.type, q: x.q, answer: x.answer || [], explain: x.explain || '' };
   if (x.type === 'mc') q.options = x.options || [];
-  q.imp = { batch, order, page: x.page || null, aiAnswer: !x.answerFromBooklet, figure: !!x.hasFigure, needsFix: !isComplete(q) };
+  q.imp = { batch, order, page: +x.page || null, aiAnswer: !x.answerFromBooklet, figure: !!x.hasFigure, needsFix: !isComplete(q) };
   return q;
 }
 
@@ -49,7 +49,7 @@ function migrateDrafts(db) {
   tx(db, () => { for (const [batch, list] of Object.entries(groups)) { const first = JSON.parse(list[0].data);
     db.prepare('INSERT OR IGNORE INTO imports(batch,name,year,subject,created) VALUES(?,?,?,?,?)').run(batch, 'Earlier import', first.year || '', first.subject || '', list[0].created);
     list.forEach((d, i) => { const q = toQuestion(JSON.parse(d.data), batch, i, 'imp-' + d.id);
-      db.prepare('INSERT OR REPLACE INTO questions(id,data,archived) VALUES(?,?,0)').run(q.id, JSON.stringify(q));
+      db.prepare('INSERT OR IGNORE INTO questions(id,data,archived) VALUES(?,?,0)').run(q.id, JSON.stringify(q)); // an already-approved copy (and any later edit or removal) wins
       db.prepare("UPDATE drafts SET status='migrated' WHERE id=?").run(d.id); }); } });
   return ds.length;
 }

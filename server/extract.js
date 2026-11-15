@@ -28,18 +28,27 @@ function parseResponse(text, { year, subject }) {
     .filter(x => { const k = (x.q + '|' + x.options.join('|')).toLowerCase().replace(/\s+/g, ' '); return !seen.has(k) && seen.add(k); });
 }
 
+// The admin is not technical: turn API failures into a few plain messages (each has a Chinese translation in public/i18n.js). The raw error goes to the server log.
+const TOO_LONG = 'This file is too long to read in one go. Split the booklet into smaller parts and upload them one at a time.';
+function friendly(status, msg) {
+  if (status === 401 || status === 403) return 'The AI key on the server is not valid. Check ANTHROPIC_API_KEY in the host settings.';
+  if (status === 429 || status === 529 || /overload/i.test(msg)) return 'Claude is busy right now. Please try again in a minute.';
+  if (status === 413 || /too long|pages|too large|maximum/i.test(msg)) return TOO_LONG;
+  return 'The AI could not read this file. Please try again, or try a smaller part of the booklet.';
+}
 async function extract({ buffer, mime, year, subject }) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) throw new Error('AI extraction needs ANTHROPIC_API_KEY set on the server.');
   const isPdf = mime === 'application/pdf';
   const block = { type: isPdf ? 'document' : 'image', source: { type: 'base64', media_type: mime, data: buffer.toString('base64') } };
-  const r = await fetch((process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com') + '/v1/messages', {
+  let r, j;
+  try { r = await fetch((process.env.ANTHROPIC_BASE_URL || 'https://api.anthropic.com') + '/v1/messages', {
     method: 'POST', signal: AbortSignal.timeout(10 * 60e3), headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: process.env.EXTRACT_MODEL || 'claude-sonnet-5-5', max_tokens: 32000,
       messages: [{ role: 'user', content: [block, { type: 'text', text: `${PROMPT}\nYear group: ${year}${subject ? `\nSubject: ${subject}` : ''}` }] }] })
-  });
-  const j = await r.json();
-  if (!r.ok) throw new Error((j.error && j.error.message) || 'AI request failed');
+  }); j = await r.json().catch(() => ({})); }
+  catch (e) { console.error('extract:', e.message); throw new Error(e.name === 'TimeoutError' ? TOO_LONG : 'Could not reach Claude. Check the internet connection and try again.'); }
+  if (!r.ok) { const msg = (j.error && j.error.message) || ''; console.error('extract: HTTP', r.status, msg); throw new Error(friendly(r.status, msg)); }
   return parseResponse((j.content || []).map(c => c.text || '').join(''), { year, subject });
 }
-module.exports = { PROMPT, parseResponse, extract };
+module.exports = { PROMPT, parseResponse, extract, friendly };

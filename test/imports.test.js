@@ -94,3 +94,13 @@ test('migrateDrafts moves only pending drafts, once', () => {
   assert.deepEqual(qs.map(q => q.id).sort(), ['imp-1', 'imp-2']);
   assert.deepEqual(imports.listImports(db).map(i => [i.batch, i.name, i.year, i.created, i.count, i.marked]), [['b111', 'Earlier import', 'Year 5', 111, 2, 1]]);
 });
+
+test('migrateDrafts keeps page numbers numeric and never overwrites an existing question', () => {
+  const db = fresh();
+  db.prepare("INSERT INTO drafts(id,batch,data,created) VALUES(1,'b1',?,1),(2,'b1',?,2)").run(JSON.stringify(item({ page: '<img src=x onerror=alert(1)>' })), JSON.stringify(item({ q: 'Second' })));
+  db.prepare("INSERT INTO questions(id,data,archived) VALUES('imp-2',?,1)").run(JSON.stringify({ id: 'imp-2', q: 'Edited by admin' }));
+  imports.migrateDrafts(db);
+  const get = id => db.prepare('SELECT data, archived FROM questions WHERE id=?').get(id);
+  assert.equal(JSON.parse(get('imp-1').data).imp.page, null);
+  assert.equal(JSON.parse(get('imp-2').data).q, 'Edited by admin'); assert.equal(get('imp-2').archived, 1);
+});

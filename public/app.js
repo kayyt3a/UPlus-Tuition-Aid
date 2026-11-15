@@ -331,14 +331,14 @@ async function qbank() {
 let IMP = { batch: null, filter: 'all', note: '' };
 const when = ms => new Date(ms).toLocaleDateString(LANG === 'zh' ? 'zh-CN' : 'en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 const bookletName = n => n === 'Earlier import' ? t('Earlier import') : n;
-async function importScreen(err) {
+async function importScreen(err, note) {
   cur = importScreen; setNav('import');
   const { imports, years } = await api('/admin/imports');
   app.innerHTML = `<div class="head"><p class="eyebrow">${t('Administration')}</p><h1>${t('Import a booklet')}</h1><p class="muted" style="margin-top:6px">${t('Drop a PDF or page photos. Only the questions are kept, and they go live for students straight away. Read over them below and fix anything that needs it.')}</p></div>
     <div class="panel"><div class="row"><div><label style="margin-top:0">${t('Year group')}</label><input type="text" id="iy" list="yl" value="${esc(LS.get('iy') || years[0] || 'Year 5')}"><datalist id="yl">${years.map(y => `<option>${esc(y)}</option>`).join('')}</datalist></div>
     <div><label style="margin-top:0">${t('Subject (optional)')}</label><input type="text" id="is" placeholder="${t('Maths, English… or leave blank')}" value="${esc(LS.get('is') || '')}"></div></div>
     <div id="drop" class="drop">${ico('upload')}<br>${t('Drag and drop a booklet here, or click to choose')}<br><span class="muted">${t('PDF, PNG or JPEG · up to 30 MB · upload long booklets in parts')}</span></div>
-    <input type="file" id="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple hidden><div id="st" class="muted" style="margin-top:10px">${typeof err === 'string' ? `<span class="err">${esc(err)}</span>` : ''}</div></div>
+    <input type="file" id="file" accept="application/pdf,image/png,image/jpeg,image/webp" multiple hidden><div id="st" class="muted" style="margin-top:10px">${typeof err === 'string' ? `<span class="err">${esc(err)}</span>` : typeof note === 'string' ? esc(note) : ''}</div></div>
     <div class="panel blist"><h2>${t('Imported booklets')}</h2>${imports.length ? imports.map(i => `<div class="brow"><div><b>${esc(bookletName(i.name))}</b><div class="muted">${esc(when(i.created))} · ${esc(yl(i.year))} · ${t('{n} questions', { n: i.count })}</div></div>
       <div class="bact">${i.marked ? `<span class="tag warn">${t('{n} to check', { n: i.marked })}</span>` : ''}<button class="btn small secondary" data-b="${esc(i.batch)}">${t('Open')}</button></div></div>`).join('') : `<p class="empty">${t('No booklets imported yet.')}</p>`}</div>`;
   const drop = $('#drop'), st = $('#st');
@@ -349,11 +349,12 @@ async function importScreen(err) {
     for (const f of files) {
       st.textContent = t('Reading {f}… this can take a minute or two.', { f: f.name });
       try { const r = await fetch('/api/admin/import?' + new URLSearchParams({ year, subject, name: f.name }), { method: 'POST', headers: { 'content-type': f.type }, body: f });
-        const j = await r.json(); if (!r.ok) throw new Error(t(j.error)); last = j.batch; added += j.added; fix += j.needsFix; }
+        const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(t(j.error || 'Something went wrong')); last = j.batch; added += j.added; fix += j.needsFix; }
       catch (e) { return importScreen(`${f.name}: ${e.message}`); }
     }
-    if (files.length === 1 && last) { IMP = { batch: last, filter: 'all', note: t('{n} questions added. They are live for students now.', { n: added }) + (fix ? ' ' + t('{n} are incomplete and hidden from students until you fix them.', { n: fix }) : '') }; return bookletView(last); }
-    importScreen();
+    const msg = t('{n} questions added. They are live for students now.', { n: added }) + (fix ? ' ' + t('{n} are incomplete and hidden from students until you fix them.', { n: fix }) : '');
+    if (files.length === 1 && last) { IMP = { batch: last, filter: 'all', note: msg }; return bookletView(last); }
+    importScreen(null, msg);
   };
   drop.onclick = () => $('#file').click(); $('#file').onchange = e => upload([...e.target.files]);
   drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); }; drop.ondragleave = () => drop.classList.remove('over');
@@ -370,7 +371,7 @@ async function bookletView(batch) {
   const groups = []; shown.forEach(q => { let g = groups.find(x => x.subject === q.subject && x.topic === q.topic); if (!g) groups.push(g = { subject: q.subject, topic: q.topic, qs: [] }); g.qs.push(q); });
   const answerLine = q => `<div class="bans"><b>${t('Answer')}:</b> ${esc((q.answer || []).join(' / ')) || '—'}</div>`;
   const card = q => `<div class="panel bq" data-id="${esc(q.id)}">
-    <div>${q.imp.needsFix ? `<span class="tag bad">${t('Incomplete: hidden from students until fixed')}</span> ` : ''}${q.imp.aiAnswer ? `<span class="tag warn">${t('Answer written by AI: check it')}</span> ` : ''}${q.imp.figure ? `<span class="tag warn">${t('Refers to a diagram')}</span> ` : ''}${q.imp.page ? `<span class="tag">${t('Page {n}', { n: q.imp.page })}</span> ` : ''}<span class="tag">${typeName[q.type] || esc(q.type)}</span></div>
+    <div>${q.imp.needsFix ? `<span class="tag bad">${t('Incomplete: hidden from students until fixed')}</span> ` : ''}${q.imp.aiAnswer ? `<span class="tag warn">${t('Answer written by AI: check it')}</span> ` : ''}${q.imp.figure ? `<span class="tag warn">${t('Refers to a diagram')}</span> ` : ''}${q.imp.page ? `<span class="tag">${esc(t('Page {n}', { n: q.imp.page }))}</span> ` : ''}<span class="tag">${typeName[q.type] || esc(q.type)}</span></div>
     <div class="qtext">${esc(q.q)}</div>
     ${q.type === 'mc' ? `<ol class="bopts" type="A">${(q.options || []).map(o => `<li class="${(q.answer || []).includes(o) ? 'right' : ''}">${esc(o)}</li>`).join('')}</ol>${(q.options || []).includes((q.answer || [])[0]) ? '' : answerLine(q)}` : answerLine(q)}
     ${q.explain ? `<div class="muted"><b>${t('Explanation')}:</b> ${esc(q.explain)}</div>` : ''}
@@ -386,8 +387,8 @@ async function bookletView(batch) {
   $('#back').onclick = () => importScreen();
   app.querySelectorAll('[data-filter]').forEach(b => b.onclick = () => { IMP.filter = b.dataset.filter; bookletView(batch); });
   app.querySelectorAll('.bq').forEach(row => { const id = row.dataset.id, q = r.questions.find(x => x.id === id);
-    row.querySelector('[data-a=del]').onclick = async () => { if (confirm(t('Remove this question? Students will no longer see it, but past results are kept.'))) { await api('/admin/questions/' + id, { method: 'DELETE', body: {} }); bookletView(batch); } };
-    const ok = row.querySelector('[data-a=ok]'); if (ok) ok.onclick = async () => { await api(`/admin/questions/${id}/checked`, { body: {} }); bookletView(batch); };
+    row.querySelector('[data-a=del]').onclick = async () => { if (confirm(t('Remove this question? Students will no longer see it, but past results are kept.'))) { try { await api('/admin/questions/' + id, { method: 'DELETE', body: {} }); bookletView(batch); } catch (e) { alert(e.message); } } };
+    const ok = row.querySelector('[data-a=ok]'); if (ok) ok.onclick = async () => { try { await api(`/admin/questions/${id}/checked`, { body: {} }); bookletView(batch); } catch (e) { alert(e.message); } };
     row.querySelector('[data-a=edit]').onclick = () => { row.innerHTML = qForm(q); wireForm(row, async d => { await api('/admin/questions/' + id, { method: 'PATCH', body: d }); bookletView(batch); }, () => bookletView(batch)); }; });
 }
 boot();

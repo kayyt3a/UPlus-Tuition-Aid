@@ -34,3 +34,12 @@ test('unreadable response gives a friendly error', () => {
   assert.throws(() => parseResponse('Sorry, I cannot help.', ctx), /Could not read the AI response/);
   assert.throws(() => parseResponse('{"q":"not an array"}', ctx), /Could not read the AI response/);
 });
+
+test('API failures become plain messages the admin can act on', () => {
+  const { friendly } = require('../server/extract');
+  assert.match(friendly(401, 'invalid x-api-key'), /key on the server is not valid/);
+  assert.match(friendly(529, 'Overloaded'), /busy/);
+  assert.match(friendly(429, ''), /busy/);
+  assert.match(friendly(400, 'A maximum of 100 PDF pages may be provided.'), /Split the booklet/);
+  assert.match(friendly(500, 'internal'), /could not read this file/);
+});
